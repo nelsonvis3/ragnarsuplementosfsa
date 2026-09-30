@@ -3,7 +3,7 @@ import hmac
 import json
 import logging
 import os
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 import mercadopago
 from django.conf import settings
@@ -493,6 +493,21 @@ def webhook_mercado_pago(request):
             if pedido and pedido.estado == "pendiente":
                 nuevo_estado = estados.get(pago.get("status"), "pendiente")
                 if nuevo_estado == "aprobado":
+                    try:
+                        importe_pagado = Decimal(str(pago.get("transaction_amount")))
+                    except (InvalidOperation, TypeError, ValueError):
+                        logger.error("Mercado Pago devolvió un importe inválido para el pedido %s", pedido_id)
+                        return JsonResponse({"received": True})
+                    if pago.get("currency_id") != "ARS" or importe_pagado != pedido.total:
+                        logger.error(
+                            "El pago %s no coincide con el pedido %s: importe %s %s; esperado %s ARS",
+                            pago_id,
+                            pedido_id,
+                            importe_pagado,
+                            pago.get("currency_id"),
+                            pedido.total,
+                        )
+                        return JsonResponse({"received": True})
                     cantidades = {}
                     for item in pedido.items.select_related("producto", "combo").all():
                         if item.producto_id:
