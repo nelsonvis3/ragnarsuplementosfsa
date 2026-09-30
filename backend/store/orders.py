@@ -1,0 +1,118 @@
+import logging
+
+from django.utils import timezone
+from django.db import transaction
+
+from .emails import enviar_confirmacion_pedido
+from .models import Pedido, Producto
+
+logger = logging.getLogger(__name__)
+
+
+def expirar_reserva_pedido(pedido_id):
+    """Cancela una reserva manual vencida y devuelve las unidades al inventario."""
+    with transaction.atomic():
+        pedido = Pedido.objects.select_for_update().filter(
+            pk=pedido_id,
+            estado="pendiente",
+            proveedor_pago__in=("transferencia", "local"),
+            stock_reservado=True,
+            stock_reservado_hasta__lte=timezone.now(),
+        ).first()
+        if not pedido:
+            return False
+        cantidades = _cantidades_del_pedido(pedido)
+        productos = list(Producto.objects.select_for_update().filter(pk__in=cantidades).order_by("id"))
+        if len(productos) != len(cantidades):
+            logger.error("No se pudo liberar stock del pedido %s: falta un producto.", pedido_id)
+            return False
+        for producto in productos:
+            producto.stock += cantidades[producto.id]
+            producto.save(update_fields=["stock", "actualizado"])
+        pedido.estado = "cancelado"
+        pedido.stock_reservado = False
+        pedido.stock_reservado_hasta = None
+        pedido.save(update_fields=["estado", "stock_reservado", "stock_reservado_hasta", "actualizado"])
+        return True
+
+
+def _cantidades_del_pedido(pedido):
+    cantidades = {}
+    for item in pedido.items.select_related("producto", "combo"):
+        if item.producto_id:
+            cantidades[item.producto_id] = cantidades.get(item.producto_id, 0) + item.cantidad
+        elif item.combo_id:
+            componentes = item.componentes_combo or list(item.combo.productos.values_list("id", flat=True))
+            for producto_id in componentes:
+                cantidades[producto_id] = cantidades.get(producto_id, 0) + item.cantidad
+    return cantidades
+
+
+def procesar_pedido_manual(pedido_id, accion):
+    """Aprueba un pago manual o cancela el pedido y libera el stock reservado."""
+    correo_pedido = None
+    with transaction.atomic():
+        pedido = Pedido.objects.select_for_update().filter(pk=pedido_id).first()
+        if not pedido:
+            return False, "El pedido ya no existe."
+        if pedido.proveedor_pago not in ("transferencia", "local"):
+            return False, "Este pedido no usa un medio de pago manual."
+        if pedido.estado != "pendiente":
+            return False, f"El pedido ya está {pedido.get_estado_display().lower()}."
+        if pedido.stock_reservado and pedido.stock_reservado_hasta and pedido.stock_reservado_hasta <= timezone.now():
+            cantidades = _cantidades_del_pedido(pedido)
+            productos = list(Producto.objects.select_for_update().filter(pk__in=cantidades).order_by("id"))
+            if len(productos) != len(cantidades):
+                return False, "Falta un producto asociado al pedido; revisá el pedido manualmente."
+            for producto in productos:
+                producto.stock += cantidades[producto.id]
+                producto.save(update_fields=["stock", "actualizado"])
+            pedido.estado = "cancelado"
+            pedido.stock_reservado = False
+            pedido.stock_reservado_hasta = None
+            pedido.save(update_fields=["estado", "stock_reservado", "stock_reservado_hasta", "actualizado"])
+            return False, "La reserva venció; el pedido se canceló y el stock fue liberado."
+        if accion not in ("aprobar", "cancelar"):
+            return False, "Acción de pedido desconocida."
+
+        cantidades = _cantidades_del_pedido(pedido)
+        productos = list(
+            Producto.objects.select_for_update().filter(pk__in=cantidades).order_by("id")
+        )
+        if len(productos) != len(cantidades):
+            return False, "Falta un producto asociado al pedido; revisá el pedido manualmente."
+
+        if accion == "aprobar":
+            if not pedido.stock_reservado:
+                if any(producto.stock < cantidades[producto.id] for producto in productos):
+                    pedido.estado = "revisar_stock"
+                    pedido.save(update_fields=["estado", "actualizado"])
+                    return False, "No hay stock suficiente; el pedido pasó a revisión."
+                for producto in productos:
+                    producto.stock -= cantidades[producto.id]
+                    producto.save(update_fields=["stock", "actualizado"])
+            pedido.estado = "aprobado"
+            pedido.stock_reservado = False
+            pedido.stock_reservado_hasta = None
+            pedido.save(update_fields=["estado", "stock_reservado", "stock_reservado_hasta", "actualizado"])
+            correo_pedido = pedido
+        else:
+            if pedido.stock_reservado:
+                for producto in productos:
+                    producto.stock += cantidades[producto.id]
+                    producto.save(update_fields=["stock", "actualizado"])
+            pedido.estado = "cancelado"
+            pedido.stock_reservado = False
+            pedido.stock_reservado_hasta = None
+            pedido.save(update_fields=["estado", "stock_reservado", "stock_reservado_hasta", "actualizado"])
+
+    if correo_pedido:
+        try:
+            enviar_confirmacion_pedido(
+                correo_pedido,
+                correo_pedido.proveedor_pago,
+                pago_confirmado=True,
+            )
+        except Exception:
+            logger.exception("No se pudo enviar el correo de pago confirmado del pedido %s", pedido_id)
+    return True, "Pedido actualizado."
