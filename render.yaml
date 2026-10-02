@@ -11,10 +11,9 @@ services:
     runtime: python
     plan: 0.5c-512mb
     region: ohio
-    rootDir: backend
-    buildCommand: pip install -r ../requirements.txt && python manage.py collectstatic --noinput
-    preDeployCommand: python manage.py migrate --noinput && python manage.py ensure_catalogo
-    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    buildCommand: pip install -r requirements.txt && python backend/manage.py collectstatic --noinput
+    preDeployCommand: python backend/manage.py migrate --noinput && python backend/manage.py ensure_catalogo
+    startCommand: gunicorn --chdir backend config.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /health/
     envVars:
       - key: PYTHON_VERSION
@@ -35,7 +34,7 @@ services:
       - key: FRONTEND_URL
         value: https://ragnar-web.onrender.com
       - key: CORS_ALLOWED_ORIGIN_REGEXES
-        value: ^https://ragnar-web(?:-[a-z0-9]+)?\.onrender\.com$
+        value: ^https://ragnar-web(?:-[a-z0-9-]+)?\.onrender\.com$
       - key: PEDIDO_RESERVA_MINUTOS
         value: "1440"
       - key: DJANGO_SECURE_SSL_REDIRECT
@@ -71,10 +70,9 @@ services:
     runtime: python
     plan: 0.5c-512mb
     region: ohio
-    rootDir: backend
     schedule: "*/15 * * * *"
-    buildCommand: pip install -r ../requirements.txt
-    startCommand: python manage.py expirar_reservas
+    buildCommand: pip install -r requirements.txt
+    startCommand: python backend/manage.py expirar_reservas
     envVars:
       - key: PYTHON_VERSION
         value: 3.14.3
@@ -97,4 +95,4 @@ services:
       - key: FRONTEND_URL
         value: https://ragnar-web.onrender.com
       - key: CORS_ALLOWED_ORIGIN_REGEXES
-        value: ^https://ragnar-web(?:-[a-z0-9]+)?\.onrender\.com$
+        value: ^https://ragnar-web(?:-[a-z0-9-]+)?\.onrender\.com$

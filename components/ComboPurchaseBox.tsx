@@ -27,7 +27,26 @@ export default function ComboPurchaseBox({ combo }: { combo: Combo }) {
     if (sinStock) return;
 
     // El combo entra al carrito como línea propia, con su precio fijo.
-    const agregado = agregarCombo(combo.id, combo.precio, 1);
+    const itemsEnCarrito = useCartStore.getState().items;
+    const combosEnCarrito = useCartStore.getState().combos;
+    const stockDisponibleComponentes = productos.length
+      ? Math.min(...productos.map((producto) => {
+          const requeridoPorProductos = itemsEnCarrito
+            .filter((item) => item.productoId === producto.id)
+            .reduce((total, item) => total + item.cantidad, 0);
+          const requeridoPorOtrosCombos = combosEnCarrito
+            .filter((item) => item.comboId !== combo.id && item.productosIds?.includes(producto.id))
+            .reduce((total, item) => total + item.cantidad, 0);
+          return Math.max(0, producto.stock - requeridoPorProductos - requeridoPorOtrosCombos);
+        }))
+      : 0;
+    const agregado = agregarCombo(
+      combo.id,
+      combo.precio,
+      1,
+      Math.min(stock, stockDisponibleComponentes),
+      combo.productosIds
+    );
 
     setEstadoBoton(agregado ? "agregado" : "sin-stock");
     setTimeout(() => setEstadoBoton("idle"), 1800);

@@ -27,6 +27,12 @@ export interface PreferenciaPago {
   pedido_id: number;
 }
 
+export interface EstadoRetornoPago {
+  pedido_id: number;
+  estado: "pendiente" | "aprobado" | "revisar_stock" | "revision_pago" | "reembolsado" | "contracargo" | "rechazado" | "cancelado";
+  init_point: string;
+}
+
 export interface MedioPago {
   id: "mercado_pago" | "transferencia" | "local";
   nombre: string;
@@ -181,6 +187,7 @@ export async function crearPreferencia(
   telefonoComprador: string,
   emailComprador: string,
   medioPago: MedioPago["id"],
+  claveCheckout: string,
   token?: string | null,
   entrega?: {
     forma: "retiro" | "envio";
@@ -193,6 +200,7 @@ export async function crearPreferencia(
     ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     body: JSON.stringify({
       items,
+      checkout_key: claveCheckout,
       nombre_comprador: nombreComprador,
       telefono_comprador: telefonoComprador,
       email_comprador: emailComprador,
@@ -203,6 +211,11 @@ export async function crearPreferencia(
         : {}),
     }),
   });
+}
+
+export async function verificarPagoRetorno(pedidoId: string, token: string, pagoId: string): Promise<EstadoRetornoPago> {
+  const query = new URLSearchParams({ pedido_id: pedidoId, token, payment_id: pagoId });
+  return solicitar<EstadoRetornoPago>(`/pagos/verificar-retorno?${query.toString()}`);
 }
 
 export interface SolicitudAtencionInput {

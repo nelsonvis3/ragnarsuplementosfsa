@@ -26,8 +26,20 @@ export default function ProductPurchaseBox({
   const [estadoBoton, setEstadoBoton] = useState<EstadoBoton>("idle");
 
   const agregarItem = useCartStore((state) => state.agregarItem);
+  const itemsEnCarrito = useCartStore((state) => state.items);
+  const combosEnCarrito = useCartStore((state) => state.combos);
 
   const sinStock = producto.stock <= 0;
+  const cantidadOtrosSabores = itemsEnCarrito
+    .filter((item) => item.productoId === producto.id && item.sabor !== (saborActivo?.nombre ?? null))
+    .reduce((total, item) => total + item.cantidad, 0);
+  const cantidadEnCombos = combosEnCarrito
+    .filter((item) => item.productosIds?.includes(producto.id))
+    .reduce((total, item) => total + item.cantidad, 0);
+  const stockDisponibleParaSabor = Math.max(0, producto.stock - cantidadOtrosSabores - cantidadEnCombos);
+  const cantidadSaborEnCarrito = itemsEnCarrito.find(
+    (item) => item.productoId === producto.id && item.sabor === (saborActivo?.nombre ?? null)
+  )?.cantidad ?? 0;
   const imagenActual = saborActivo ? saborActivo.imagen : producto.imagen;
 
   function handleAgregar() {
@@ -36,7 +48,8 @@ export default function ProductPurchaseBox({
     const agregado = agregarItem(
       producto.id,
       saborActivo?.nombre ?? null,
-      cantidad
+      cantidad,
+      stockDisponibleParaSabor
     );
     setEstadoBoton(agregado ? "agregado" : "sin-stock");
     setTimeout(() => setEstadoBoton("idle"), 1800);
@@ -44,7 +57,7 @@ export default function ProductPurchaseBox({
 
   function cambiarCantidad(delta: number) {
     setCantidad((actual) =>
-      Math.max(1, Math.min(producto.stock, actual + delta))
+      Math.max(1, Math.min(Math.max(1, stockDisponibleParaSabor - cantidadSaborEnCarrito), actual + delta))
     );
   }
 
@@ -133,7 +146,7 @@ export default function ProductPurchaseBox({
         {/* Botón de agregar con feedback visual */}
         <button
           onClick={handleAgregar}
-          disabled={sinStock}
+          disabled={sinStock || cantidadSaborEnCarrito + cantidad > stockDisponibleParaSabor}
           className={`mt-8 flex w-full items-center justify-center gap-2 px-7 py-4 text-sm font-semibold uppercase tracking-wide transition-colors ${
             sinStock
               ? "cursor-not-allowed bg-carbon-line text-bone-dim"

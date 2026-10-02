@@ -150,7 +150,7 @@ export const PRODUCTOS: Producto[] = [
     sabores: [
       { nombre: "Frutilla", imagen: "/productos-img/colagenos/colageno-onefit/colagenofrutilla.png" },
     ],
-    stock: 10,
+    stock: 5,
   },
   {
     id: 11,

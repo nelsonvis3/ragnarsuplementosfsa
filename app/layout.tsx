@@ -29,6 +29,7 @@ export default function RootLayout({
     <html
       lang="es"
       className={`${spaceGrotesk.variable} ${inter.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
         <script

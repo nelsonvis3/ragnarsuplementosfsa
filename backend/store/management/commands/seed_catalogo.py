@@ -54,6 +54,21 @@ SABORES = {
     "pasta-de-mani-entrenuts-370g": ["Caramelo Salado", "Cookies & Cream"],
 }
 
+IMAGENES_SABORES = {
+    "creatina-star-300-gramos": {
+        "Frutos Rojos": "/productos-img/creatinas/creatina-star/frutosrojos.png",
+    },
+    "proteina-star": {
+        "Frutilla": "/productos-img/proteinas/proteina-star/protestarfrutilla.png",
+    },
+    "pancakes-400g": {
+        "Chocolate": "/productos-img/alimentos/pancakes-chocolate.png",
+    },
+    "pasta-de-mani-entrenuts-370g": {
+        "Caramelo Salado": "/productos-img/alimentos/pasta-cokacream-caramelo-salado.png",
+    },
+}
+
 COMBOS = [
     ("combo-proteina-onefit-creatina-star", "Combo Proteína OneFit + Creatina Star", "Proteína OneFit 907g junto a Creatina Star 300g.", 64000, "/productos-img/combos/proteina-onefit-creatina-star.jpg", ["proteina-onefit", "creatina-star-300-gramos"]),
     ("combo-proteina-creatina-onefit-500g", "Combo Proteína OneFit + Creatina OneFit 500g", "Proteína OneFit 907g junto a Creatina OneFit 500g.", 65000, "/productos-img/combos/proteina-onefit-creatina-500g.jpg", ["proteina-onefit", "creatina-onefit-500g"]),
@@ -75,7 +90,10 @@ class Command(BaseCommand):
                 "precio": precio,
                 "imagen": imagen,
                 "descripcion": DESCRIPCIONES[slug],
-                "sabores": [{"nombre": sabor, "imagen": imagen} for sabor in SABORES[slug]],
+                "sabores": [
+                    {"nombre": sabor, "imagen": IMAGENES_SABORES.get(slug, {}).get(sabor, imagen)}
+                    for sabor in SABORES[slug]
+                ],
                 "activo": True,
             }
             producto, creado = Producto.objects.get_or_create(

@@ -11,16 +11,17 @@ export interface CartCombo {
   comboId: number;
   precioUnitario: number;
   cantidad: number;
+  productosIds?: number[];
 }
 
 interface CartState {
   items: CartItem[];
   combos: CartCombo[];
-  agregarItem: (productoId: number, sabor: string | null, cantidad?: number) => boolean;
-  actualizarCantidad: (productoId: number, sabor: string | null, delta: number) => void;
+  agregarItem: (productoId: number, sabor: string | null, cantidad?: number, stockDisponible?: number) => boolean;
+  actualizarCantidad: (productoId: number, sabor: string | null, delta: number, stockDisponible?: number) => void;
   eliminarItem: (productoId: number, sabor: string | null) => void;
-  agregarCombo: (comboId: number, precioUnitario: number, cantidad?: number) => boolean;
-  actualizarCantidadCombo: (comboId: number, delta: number) => void;
+  agregarCombo: (comboId: number, precioUnitario: number, cantidad?: number, stockDisponible?: number, productosIds?: number[]) => boolean;
+  actualizarCantidadCombo: (comboId: number, delta: number, stockDisponible?: number) => void;
   eliminarCombo: (comboId: number) => void;
   vaciarCarrito: () => void;
 }
@@ -37,29 +38,33 @@ export const useCartStore = create<CartState>()(
       items: [],
       combos: [],
 
-      agregarItem: (productoId, sabor, cantidad = 1) => {
+      agregarItem: (productoId, sabor, cantidad = 1, stockDisponible = CANTIDAD_MAXIMA_POR_LINEA) => {
         const cantidadAgregar = Math.max(1, Math.min(CANTIDAD_MAXIMA_POR_LINEA, Math.floor(cantidad)));
+        let agregado = false;
         set((state) => {
           const existente = state.items.find((item) => mismoItem(item, productoId, sabor));
+          const cantidadActual = existente?.cantidad ?? 0;
+          if (cantidadActual + cantidadAgregar > Math.min(CANTIDAD_MAXIMA_POR_LINEA, stockDisponible)) return state;
+          agregado = true;
           if (existente) {
             return {
               items: state.items.map((item) =>
                 mismoItem(item, productoId, sabor)
-                  ? { ...item, cantidad: Math.min(CANTIDAD_MAXIMA_POR_LINEA, item.cantidad + cantidadAgregar) }
+                  ? { ...item, cantidad: item.cantidad + cantidadAgregar }
                   : item
               ),
             };
           }
           return { items: [...state.items, { productoId, sabor, cantidad: cantidadAgregar }] };
         });
-        return true;
+        return agregado;
       },
 
-      actualizarCantidad: (productoId, sabor, delta) =>
+      actualizarCantidad: (productoId, sabor, delta, stockDisponible = CANTIDAD_MAXIMA_POR_LINEA) =>
         set((state) => {
           const itemActual = state.items.find((item) => mismoItem(item, productoId, sabor));
           if (!itemActual) return state;
-          const cantidad = Math.max(0, Math.min(CANTIDAD_MAXIMA_POR_LINEA, itemActual.cantidad + Math.trunc(delta)));
+          const cantidad = Math.max(0, Math.min(CANTIDAD_MAXIMA_POR_LINEA, stockDisponible, itemActual.cantidad + Math.trunc(delta)));
           return {
             items: state.items
               .map((item) => (mismoItem(item, productoId, sabor) ? { ...item, cantidad } : item))
@@ -70,10 +75,14 @@ export const useCartStore = create<CartState>()(
       eliminarItem: (productoId, sabor) =>
         set((state) => ({ items: state.items.filter((item) => !mismoItem(item, productoId, sabor)) })),
 
-      agregarCombo: (comboId, precioUnitario, cantidad = 1) => {
+      agregarCombo: (comboId, precioUnitario, cantidad = 1, stockDisponible = CANTIDAD_MAXIMA_POR_LINEA, productosIds = []) => {
         const cantidadAgregar = Math.max(1, Math.min(CANTIDAD_MAXIMA_POR_LINEA, Math.floor(cantidad)));
+        let agregado = false;
         set((state) => {
           const existente = state.combos.find((item) => item.comboId === comboId);
+          const cantidadActual = existente?.cantidad ?? 0;
+          if (cantidadActual + cantidadAgregar > Math.min(CANTIDAD_MAXIMA_POR_LINEA, stockDisponible)) return state;
+          agregado = true;
           if (existente) {
             return {
               combos: state.combos.map((item) =>
@@ -81,24 +90,25 @@ export const useCartStore = create<CartState>()(
                   ? {
                       ...item,
                       precioUnitario,
-                      cantidad: Math.min(CANTIDAD_MAXIMA_POR_LINEA, item.cantidad + cantidadAgregar),
+                      productosIds,
+                      cantidad: item.cantidad + cantidadAgregar,
                     }
                   : item
               ),
             };
           }
           return {
-            combos: [...state.combos, { comboId, precioUnitario, cantidad: cantidadAgregar }],
+            combos: [...state.combos, { comboId, precioUnitario, cantidad: cantidadAgregar, productosIds }],
           };
         });
-        return true;
+        return agregado;
       },
 
-      actualizarCantidadCombo: (comboId, delta) =>
+      actualizarCantidadCombo: (comboId, delta, stockDisponible = CANTIDAD_MAXIMA_POR_LINEA) =>
         set((state) => {
           const comboActual = state.combos.find((item) => item.comboId === comboId);
           if (!comboActual) return state;
-          const cantidad = Math.max(0, Math.min(CANTIDAD_MAXIMA_POR_LINEA, comboActual.cantidad + Math.trunc(delta)));
+          const cantidad = Math.max(0, Math.min(CANTIDAD_MAXIMA_POR_LINEA, stockDisponible, comboActual.cantidad + Math.trunc(delta)));
           return {
             combos: state.combos
               .map((item) => (item.comboId === comboId ? { ...item, cantidad } : item))
