@@ -77,12 +77,27 @@ export default function AtencionForm({ tipoInicial }: { tipoInicial: TipoSolicit
         )}
       </div>
 
-      {tipo !== "arrepentimiento" && (
-        <div className="mt-4">
-          <label htmlFor="atencion-mensaje" className="mb-2 block text-sm">Mensaje</label>
-          <textarea id="atencion-mensaje" required maxLength={3000} rows={5} value={mensaje} onChange={(event) => setMensaje(event.target.value)} className="w-full resize-y border border-carbon-line bg-carbon px-3 py-3 text-sm" />
-        </div>
-      )}
+      <div className="mt-4">
+        {tipo === "arrepentimiento" && (
+          <p id="atencion-motivo-ayuda" className="mb-3 text-sm leading-6 text-bone-dim">
+            Contanos brevemente por qué querés arrepentirte de la compra. El motivo nos ayuda a identificar el caso y gestionar tu solicitud.
+          </p>
+        )}
+        <label htmlFor="atencion-mensaje" className="mb-2 block text-sm">
+          {tipo === "arrepentimiento" ? "Motivo del arrepentimiento" : "Mensaje"}
+        </label>
+        <textarea
+          id="atencion-mensaje"
+          required
+          maxLength={3000}
+          rows={5}
+          value={mensaje}
+          onChange={(event) => setMensaje(event.target.value)}
+          placeholder={tipo === "arrepentimiento" ? "Por ejemplo: recibí un producto distinto, cambié de opinión…" : undefined}
+          aria-describedby={tipo === "arrepentimiento" ? "atencion-motivo-ayuda" : undefined}
+          className="w-full resize-y border border-carbon-line bg-carbon px-3 py-3 text-sm"
+        />
+      </div>
 
       {error && <p role="alert" className="mt-4 border border-ember/40 bg-ember/10 p-3 text-sm text-ember">{error}</p>}
       <button type="submit" disabled={enviando} className="mt-5 w-full bg-ember px-5 py-3 text-sm font-semibold text-carbon hover:bg-ember-bright disabled:opacity-60">

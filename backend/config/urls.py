@@ -17,5 +17,6 @@ urlpatterns = [
     path("envios/cotizar", views.cotizar_envio),
     path("pagos/crear-preferencia", views.crear_preferencia),
     path("pagos/webhook", views.webhook_mercado_pago),
+    path("pagos/verificar-retorno", views.verificar_pago_retorno),
     path("atencion/solicitudes", views.crear_solicitud_atencion),
 ]

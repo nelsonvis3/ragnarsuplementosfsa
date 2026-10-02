@@ -1,6 +1,7 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 import dj_database_url
 from dotenv import load_dotenv
@@ -114,8 +115,26 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_THROTTLE_RATES": {"solicitud_atencion": "10/hour"},
+    "DEFAULT_THROTTLE_RATES": {
+        "solicitud_atencion": "10/hour",
+        "registro": "5/hour",
+        "login": "10/minute",
+        "pago_retorno": "30/hour",
+    },
 }
+
+if not DEBUG and os.getenv("MP_ENABLED", "false").strip().lower() == "true":
+    mp_access_token = os.getenv("MP_ACCESS_TOKEN", "").strip()
+    if not mp_access_token or mp_access_token.startswith("TU_"):
+        raise RuntimeError("MP_ENABLED requiere configurar MP_ACCESS_TOKEN en producción.")
+    mp_webhook_url = urlparse(os.getenv("MP_WEBHOOK_URL", "").strip())
+    if (
+        mp_webhook_url.scheme != "https"
+        or not mp_webhook_url.hostname
+        or mp_webhook_url.path.rstrip("/") != "/pagos/webhook"
+        or not os.getenv("MP_WEBHOOK_SECRET", "").strip()
+    ):
+        raise RuntimeError("Mercado Pago requiere MP_WEBHOOK_URL y MP_WEBHOOK_SECRET en producción.")
 
 PEDIDO_RESERVA_MINUTOS = max(1, int(os.getenv("PEDIDO_RESERVA_MINUTOS", "1440")))
 

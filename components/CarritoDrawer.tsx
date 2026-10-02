@@ -2,11 +2,11 @@
 
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { X, Minus, Plus, Trash2 } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { useAuthStore } from "@/store/auth-store";
-import { cotizarEnvio, crearPreferencia, listarCombos, listarMediosPago, listarProductos } from "@/lib/api";
+import { ApiError, cotizarEnvio, crearPreferencia, listarCombos, listarMediosPago, listarProductos } from "@/lib/api";
 import type { CotizacionEnvio, MedioPago, PedidoManual } from "@/lib/api";
 import type { Combo, Producto } from "@/types/producto";
 
@@ -37,25 +37,26 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
   const [formaEntrega, setFormaEntrega] = useState<"retiro" | "envio">("retiro");
   const [direccionEntrega, setDireccionEntrega] = useState("");
   const [cotizacion, setCotizacion] = useState<CotizacionEnvio | null>(null);
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
   // Lógica interna: Django calcula la ruta, aplica los tramos configurados en backend/.env
   // (1 km gratis; luego $1.000, $2.500, $3.500 y $5.000 hasta 12 km) y firma la cotización por 15 minutos.
   const [cotizandoEnvio, setCotizandoEnvio] = useState(false);
   const [nombre, setNombre] = useState("");
+  const [nombreEditado, setNombreEditado] = useState(false);
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
+  const [emailEditado, setEmailEditado] = useState(false);
   const [checkoutCargando, setCheckoutCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const checkoutKey = useRef<string | null>(null);
+  const checkoutFirma = useRef<string | null>(null);
   const catalogoCargando = abierto && !catalogoListo;
-
-  useEffect(() => {
-    if (usuario?.email) setEmail((actual) => actual || usuario.email);
-    if (usuario?.nombre_completo) setNombre((actual) => actual || usuario.nombre_completo);
-  }, [usuario?.email, usuario?.nombre_completo]);
+  const nombreCheckout = nombreEditado ? nombre : nombre || usuario?.nombre_completo || "";
+  const emailCheckout = emailEditado ? email : email || usuario?.email || "";
 
   useEffect(() => {
     if (!abierto) return;
     let vigente = true;
-    setCatalogoListo(false);
     Promise.all([listarProductos(), listarCombos(), listarMediosPago()])
       .then(([productosApi, combosApi, metodosApi]) => {
         if (!vigente) return;
@@ -91,12 +92,12 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
     };
   }, [abierto]);
 
-  useEffect(() => {
-    if (!abierto) {
-      setPedidoManual(null);
-      setError(null);
-    }
-  }, [abierto]);
+  function cerrarDrawer() {
+    setPedidoManual(null);
+    setError(null);
+    setCatalogoListo(false);
+    onCerrar();
+  }
 
   const productosPorId = useMemo(() => new Map(productos.map((producto) => [producto.id, producto])), [productos]);
   const combosPorId = useMemo(() => new Map(catalogoCombos.map((combo) => [combo.id, combo])), [catalogoCombos]);
@@ -120,6 +121,39 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
   const total = subtotal + costoEnvio;
   const carritoVacio = items.length === 0 && combos.length === 0;
   const hayLineasSinCatalogo = itemsConDatos.length !== items.length || combosConDatos.length !== combos.length;
+  const cantidadesPorProducto = useMemo(() => {
+    const cantidades = new Map<number, number>();
+    for (const item of items) {
+      cantidades.set(item.productoId, (cantidades.get(item.productoId) ?? 0) + item.cantidad);
+    }
+    for (const item of combos) {
+      const combo = combosPorId.get(item.comboId);
+      for (const productoId of combo?.productosIds ?? item.productosIds ?? []) {
+        cantidades.set(productoId, (cantidades.get(productoId) ?? 0) + item.cantidad);
+      }
+    }
+    return cantidades;
+  }, [items, combos, combosPorId]);
+  const hayStockInsuficiente = productos.some(
+    (producto) => (cantidadesPorProducto.get(producto.id) ?? 0) > producto.stock
+  );
+
+  function stockMaximoDeItem(productoId: number, cantidadActual: number) {
+    const producto = productosPorId.get(productoId);
+    if (!producto) return 0;
+    return Math.max(0, producto.stock - ((cantidadesPorProducto.get(productoId) ?? 0) - cantidadActual));
+  }
+
+  function stockMaximoDeCombo(comboId: number, cantidadActual: number) {
+    const combo = combosPorId.get(comboId);
+    const ids = combo?.productosIds ?? [];
+    if (!ids.length) return 0;
+    return Math.max(0, Math.min(...ids.map((id) => {
+      const producto = productosPorId.get(id);
+      if (!producto) return 0;
+      return producto.stock - ((cantidadesPorProducto.get(id) ?? 0) - cantidadActual);
+    })));
+  }
   const mensajeWhatsapp = pedidoManual
     ? pedidoManual.medio_pago === "transferencia"
       ? `Hola, realicé la transferencia del pedido #${pedidoManual.pedido_id} por ${formatearPrecio(pedidoManual.total)}. Adjunto el comprobante.`
@@ -130,8 +164,9 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
   const whatsappPedidoUrl = `https://wa.me/5493704696533?text=${encodeURIComponent(mensajeWhatsapp)}`;
 
   async function handleCotizarEnvio() {
+    setErrorEnvio(null);
     if (!direccionEntrega.trim()) {
-      setError("Escribí la calle, altura y barrio para calcular el envío.");
+      setErrorEnvio("Escribí la calle, altura y barrio para calcular el envío.");
       return;
     }
     setCotizandoEnvio(true);
@@ -141,7 +176,7 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
       setCotizacion(resultado);
     } catch (err) {
       setCotizacion(null);
-      setError(err instanceof Error ? err.message : "No pudimos calcular el envío.");
+      setErrorEnvio(err instanceof Error ? err.message : "No pudimos calcular el envío.");
     } finally {
       setCotizandoEnvio(false);
     }
@@ -152,6 +187,10 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
     setError(null);
     if (hayLineasSinCatalogo) {
       setError("Hay artículos que ya no están disponibles. Quitalos del carrito para continuar.");
+      return;
+    }
+    if (hayStockInsuficiente) {
+      setError("La cantidad del carrito supera el stock actual. Ajustá los artículos antes de continuar.");
       return;
     }
     if (!medioPago) {
@@ -173,14 +212,62 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
         })),
         ...combos.map((combo) => ({ tipo: "combo" as const, id: combo.comboId, cantidad: combo.cantidad })),
       ];
-      const resultado = await crearPreferencia(lineas, nombre.trim(), telefono.trim(), email.trim(), medioPago, token, {
-        forma: formaEntrega,
-        ...(formaEntrega === "envio"
-          ? { direccion: direccionEntrega.trim(), cotizacionEnvio: cotizacion?.cotizacion_envio }
-          : {}),
+      const firmaCheckout = JSON.stringify({
+        lineas,
+        nombre: nombreCheckout.trim(),
+        telefono: telefono.trim(),
+        email: emailCheckout.trim(),
+        medioPago,
+        formaEntrega,
+        direccion: direccionEntrega.trim(),
+        cotizacion: cotizacion?.cotizacion_envio ?? "",
+        usuario: usuario?.id ?? null,
       });
+      if (checkoutFirma.current !== firmaCheckout) {
+        let claveGuardada: string | null = null;
+        let firmaGuardada: string | null = null;
+        try {
+          claveGuardada = sessionStorage.getItem("ragnar_checkout_key");
+          firmaGuardada = sessionStorage.getItem("ragnar_checkout_firma");
+        } catch {
+          // Si el navegador bloquea el almacenamiento, se mantiene la clave solo en memoria.
+        }
+        checkoutKey.current = claveGuardada && firmaGuardada === firmaCheckout ? claveGuardada : crypto.randomUUID();
+        checkoutFirma.current = firmaCheckout;
+      }
+      const claveCheckout = checkoutKey.current ?? crypto.randomUUID();
+      checkoutKey.current = claveCheckout;
+      try {
+        sessionStorage.setItem("ragnar_checkout_key", claveCheckout);
+        sessionStorage.setItem("ragnar_checkout_firma", firmaCheckout);
+      } catch {
+        // El flujo de compra sigue funcionando aunque el navegador bloquee el almacenamiento de sesión.
+      }
+      const resultado = await crearPreferencia(
+        lineas,
+        nombreCheckout.trim(),
+        telefono.trim(),
+        emailCheckout.trim(),
+        medioPago,
+        claveCheckout,
+        token,
+        {
+          forma: formaEntrega,
+          ...(formaEntrega === "envio"
+            ? { direccion: direccionEntrega.trim(), cotizacionEnvio: cotizacion?.cotizacion_envio }
+            : {}),
+        }
+      );
       if (resultado.tipo === "manual") {
         setPedidoManual(resultado);
+        checkoutKey.current = null;
+        checkoutFirma.current = null;
+        try {
+          sessionStorage.removeItem("ragnar_checkout_key");
+          sessionStorage.removeItem("ragnar_checkout_firma");
+        } catch {
+          // La confirmación del pedido no depende del almacenamiento de sesión.
+        }
         useCartStore.getState().vaciarCarrito();
         setCheckoutCargando(false);
         return;
@@ -188,6 +275,16 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
       if (!resultado.init_point) throw new Error("Mercado Pago no devolvió el enlace de pago.");
       window.location.assign(resultado.init_point);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && err.mensaje.includes("reserva del pedido anterior venció")) {
+        checkoutKey.current = null;
+        checkoutFirma.current = null;
+        try {
+          sessionStorage.removeItem("ragnar_checkout_key");
+          sessionStorage.removeItem("ragnar_checkout_firma");
+        } catch {
+          // Se puede continuar con una clave nueva mantenida en memoria.
+        }
+      }
       setError(err instanceof Error ? err.message : "No pudimos iniciar el pago. Intentá de nuevo.");
       setCheckoutCargando(false);
     }
@@ -200,7 +297,7 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
       <button
         type="button"
         aria-label="Cerrar carrito"
-        onClick={onCerrar}
+        onClick={cerrarDrawer}
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
       />
       <section
@@ -211,13 +308,13 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
       >
         <div className="flex shrink-0 items-center justify-between border-b border-carbon-line px-5 py-4">
           <h2 id="cart-dialog-title" className="font-display text-lg font-semibold">Tu carrito</h2>
-          <button type="button" aria-label="Cerrar carrito" onClick={onCerrar} className="p-1 hover:text-ember">
+          <button type="button" aria-label="Cerrar carrito" onClick={cerrarDrawer} className="p-1 hover:text-ember">
             <X size={22} />
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
-          <section className={`min-h-0 overflow-y-auto border-b border-carbon-line p-4 sm:p-5 md:border-b-0 md:border-r ${!carritoVacio && !pedidoManual ? "max-h-[34dvh] shrink-0 md:max-h-none md:shrink" : "flex-1"}`}>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain md:grid md:overflow-hidden md:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
+          <section className={`border-b border-carbon-line p-4 sm:p-5 md:min-h-0 md:overflow-y-auto md:border-b-0 md:border-r ${!carritoVacio && !pedidoManual ? "shrink-0 md:flex-1" : "flex-1"}`}>
             {pedidoManual && (
               <div className="border border-signal/40 bg-signal/10 p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-signal">Pedido recibido</p>
@@ -249,20 +346,20 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
             {!pedidoManual && !catalogoCargando && carritoVacio && <p className="mt-10 text-center text-sm text-bone-dim">Tu carrito está vacío.</p>}
 
             {!pedidoManual && !catalogoCargando && !carritoVacio && (
-              <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2 sm:gap-3">
                 {combosConDatos.map((combo) => (
-                  <div key={`combo-${combo.comboId}`} className="flex gap-3 border-b border-carbon-line pb-5">
-                    <div className="relative h-16 w-16 shrink-0 bg-carbon">
+                  <div key={`combo-${combo.comboId}`} className="flex items-center gap-2 border-b border-carbon-line pb-2 sm:gap-3 sm:pb-3">
+                    <div className="relative h-10 w-10 shrink-0 bg-carbon sm:h-12 sm:w-12">
                       <Image src={combo.imagen} alt={combo.nombre} fill className="object-contain p-1" />
                     </div>
                     <div className="flex-1">
                       <span className="text-[10px] uppercase tracking-wide text-ember">Combo</span>
                       <p className="text-sm font-medium">{combo.nombre}</p>
-                      <div className="mt-2 flex items-center gap-3">
+                      <div className="mt-1 flex items-center gap-2">
                         <div className="flex items-center border border-carbon-line">
-                          <button onClick={() => actualizarCantidadCombo(combo.comboId, -1)} className="p-1.5 text-bone-dim hover:text-ember" aria-label="Restar"><Minus size={12} /></button>
+                          <button onClick={() => actualizarCantidadCombo(combo.comboId, -1, stockMaximoDeCombo(combo.comboId, combo.cantidad))} className="p-1.5 text-bone-dim hover:text-ember" aria-label="Restar"><Minus size={12} /></button>
                           <span className="w-6 text-center text-xs">{combo.cantidad}</span>
-                          <button onClick={() => actualizarCantidadCombo(combo.comboId, 1)} className="p-1.5 text-bone-dim hover:text-ember" aria-label="Sumar"><Plus size={12} /></button>
+                          <button disabled={combo.cantidad >= stockMaximoDeCombo(combo.comboId, combo.cantidad)} onClick={() => actualizarCantidadCombo(combo.comboId, 1, stockMaximoDeCombo(combo.comboId, combo.cantidad))} className="p-1.5 text-bone-dim hover:text-ember disabled:opacity-40" aria-label="Sumar"><Plus size={12} /></button>
                         </div>
                         <button onClick={() => eliminarCombo(combo.comboId)} aria-label="Eliminar combo" className="text-bone-dim hover:text-ember"><Trash2 size={14} /></button>
                       </div>
@@ -272,18 +369,18 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
                 ))}
 
                 {itemsConDatos.map((item) => (
-                  <div key={`${item.productoId}-${item.sabor ?? "default"}`} className="flex gap-3 border-b border-carbon-line pb-5">
-                    <div className="relative h-16 w-16 shrink-0 bg-carbon">
+                  <div key={`${item.productoId}-${item.sabor ?? "default"}`} className="flex items-center gap-2 border-b border-carbon-line pb-2 sm:gap-3 sm:pb-3">
+                    <div className="relative h-10 w-10 shrink-0 bg-carbon sm:h-12 sm:w-12">
                       <Image src={item.imagen} alt={item.nombre} fill className="object-contain p-1" />
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{item.nombre}</p>
                       {item.sabor && <p className="text-xs text-bone-dim">Sabor: {item.sabor}</p>}
-                      <div className="mt-2 flex items-center gap-3">
+                      <div className="mt-1 flex items-center gap-2">
                         <div className="flex items-center border border-carbon-line">
-                          <button onClick={() => actualizarCantidad(item.productoId, item.sabor, -1)} className="p-1.5 text-bone-dim hover:text-ember" aria-label="Restar"><Minus size={12} /></button>
+                          <button onClick={() => actualizarCantidad(item.productoId, item.sabor, -1, stockMaximoDeItem(item.productoId, item.cantidad))} className="p-1.5 text-bone-dim hover:text-ember" aria-label="Restar"><Minus size={12} /></button>
                           <span className="w-6 text-center text-xs">{item.cantidad}</span>
-                          <button onClick={() => actualizarCantidad(item.productoId, item.sabor, 1)} className="p-1.5 text-bone-dim hover:text-ember" aria-label="Sumar"><Plus size={12} /></button>
+                          <button disabled={item.cantidad >= stockMaximoDeItem(item.productoId, item.cantidad)} onClick={() => actualizarCantidad(item.productoId, item.sabor, 1, stockMaximoDeItem(item.productoId, item.cantidad))} className="p-1.5 text-bone-dim hover:text-ember disabled:opacity-40" aria-label="Sumar"><Plus size={12} /></button>
                         </div>
                         <button onClick={() => eliminarItem(item.productoId, item.sabor)} aria-label="Eliminar producto" className="text-bone-dim hover:text-ember"><Trash2 size={14} /></button>
                       </div>
@@ -292,16 +389,17 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
                   </div>
                 ))}
                 {hayLineasSinCatalogo && <p className="text-sm text-ember">Hay productos desactualizados en tu carrito.</p>}
+                {hayStockInsuficiente && <p className="text-sm text-ember">La cantidad supera el stock actualizado. Reducila antes de pagar.</p>}
               </div>
             )}
           </section>
 
           {!pedidoManual && !carritoVacio && (
-            <form onSubmit={handleFinalizarCompra} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
-              <fieldset className="mb-4">
-                <legend className="mb-2 text-sm font-medium">¿Cómo querés recibirlo?</legend>
-                <div className="flex flex-col gap-2">
-                  <label className="flex cursor-pointer items-start gap-2 border border-carbon-line p-3 hover:border-ember">
+            <form onSubmit={handleFinalizarCompra} className="shrink-0 p-3 sm:p-5 md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain">
+              <fieldset className="mb-2 sm:mb-4">
+                <legend className="mb-1 text-sm font-medium sm:mb-2">¿Cómo querés recibirlo?</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex cursor-pointer items-start gap-2 border border-carbon-line p-2 sm:p-3 hover:border-ember">
                     <input
                       type="radio"
                       name="forma-entrega"
@@ -312,10 +410,10 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
                     />
                     <span>
                       <span className="block text-sm font-medium">Retirar en el local</span>
-                      <span className="mt-1 block text-xs text-bone-dim">Azcuénaga 991, Formosa.</span>
+                      <span className="mt-1 hidden text-xs text-bone-dim sm:block">Azcuénaga 991, Formosa.</span>
                     </span>
                   </label>
-                  <label className="flex cursor-pointer items-start gap-2 border border-carbon-line p-3 hover:border-ember">
+                  <label className="flex cursor-pointer items-start gap-2 border border-carbon-line p-2 sm:p-3 hover:border-ember">
                     <input
                       type="radio"
                       name="forma-entrega"
@@ -326,15 +424,15 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
                     />
                     <span>
                       <span className="block text-sm font-medium">Envío a domicilio en Formosa</span>
-                      <span className="mt-1 block text-xs text-bone-dim">Entregas en Formosa Capital.</span>
+                      <span className="mt-1 hidden text-xs text-bone-dim sm:block">Entregas en Formosa Capital.</span>
                     </span>
                   </label>
                 </div>
               </fieldset>
 
               {formaEntrega === "envio" && (
-                <div className="mb-4 border border-carbon-line p-3">
-                  <label htmlFor="checkout-direccion" className="mb-2 block text-sm">Dirección de entrega</label>
+                <div className="mb-2 border border-carbon-line p-2 sm:mb-4 sm:p-3">
+                  <label htmlFor="checkout-direccion" className="mb-1 block text-sm">Dirección de entrega</label>
                   <input
                     id="checkout-direccion"
                     type="text"
@@ -344,6 +442,7 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
                     onChange={(event) => {
                       setDireccionEntrega(event.target.value);
                       setCotizacion(null);
+                      setErrorEnvio(null);
                     }}
                     placeholder="Calle, altura y barrio"
                     className="w-full border border-carbon-line bg-carbon px-3 py-2 text-sm outline-none focus:border-ember"
@@ -352,41 +451,49 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
                     type="button"
                     onClick={handleCotizarEnvio}
                     disabled={cotizandoEnvio || !direccionEntrega.trim()}
-                    className="mt-3 w-full border border-ember px-4 py-2 text-sm font-semibold text-ember hover:bg-ember/10 disabled:opacity-50"
+                    className="mt-2 w-full border border-ember px-4 py-1.5 text-sm font-semibold text-ember hover:bg-ember/10 disabled:opacity-50"
                   >
                     {cotizandoEnvio ? "Calculando…" : "Ver costo de envío"}
                   </button>
-                  <p className="mt-2 text-[11px] text-bone-dim">
+                  {errorEnvio && <p role="alert" className="mt-2 text-sm text-ember">{errorEnvio}</p>}
+                  <p className="mt-1 text-[10px] leading-tight text-bone-dim sm:text-[11px]">
                     Tu dirección se comparte y puede registrarse para cotizar. <a className="underline" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · rutas de <a className="underline" href="https://routing.openstreetmap.de/about.html" target="_blank" rel="noopener noreferrer">FOSS GIS</a>.
                   </p>
                   <a
                     href="https://wa.me/5493704696533?text=Hola%2C%20quiero%20consultar%20un%20env%C3%ADo%20fuera%20del%20radio%20autom%C3%A1tico."
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-2 inline-block text-xs text-ember hover:text-ember-bright"
+                    className="mt-1 inline-block text-xs text-ember hover:text-ember-bright"
                   >
                     ¿Estás en otra zona? Consultanos
                   </a>
                   {cotizacion && (
-                    <p className="mt-3 text-sm text-signal">
+                    <p className="mt-1 text-sm text-signal">
                       Envío: {formatearPrecio(cotizacion.costo_envio)}
                     </p>
                   )}
                 </div>
               )}
 
-              <label htmlFor="checkout-nombre" className="mb-2 block text-sm">Nombre y apellido</label>
+              <div className="grid grid-cols-2 gap-x-2 sm:gap-x-3">
+              <div className="col-span-2">
+              <label htmlFor="checkout-nombre" className="mb-1 block text-xs sm:text-sm">Nombre y apellido</label>
               <input
                 id="checkout-nombre"
                 type="text"
                 required
                 maxLength={150}
                 autoComplete="name"
-                value={nombre}
-                onChange={(event) => setNombre(event.target.value)}
-                className="mb-4 w-full border border-carbon-line bg-carbon px-3 py-2 text-sm outline-none focus:border-ember"
+                    value={nombreCheckout}
+                    onChange={(event) => {
+                      setNombre(event.target.value);
+                      setNombreEditado(true);
+                    }}
+                className="mb-2 w-full border border-carbon-line bg-carbon px-2 py-1.5 text-sm outline-none focus:border-ember sm:mb-4 sm:px-3 sm:py-2"
               />
-              <label htmlFor="checkout-telefono" className="mb-2 block text-sm">Teléfono</label>
+              </div>
+              <div>
+              <label htmlFor="checkout-telefono" className="mb-1 block text-xs sm:text-sm">Teléfono</label>
               <input
                 id="checkout-telefono"
                 type="tel"
@@ -395,25 +502,32 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
                 autoComplete="tel"
                 value={telefono}
                 onChange={(event) => setTelefono(event.target.value)}
-                className="mb-4 w-full border border-carbon-line bg-carbon px-3 py-2 text-sm outline-none focus:border-ember"
+                className="mb-2 w-full border border-carbon-line bg-carbon px-2 py-1.5 text-sm outline-none focus:border-ember sm:mb-4 sm:px-3 sm:py-2"
               />
-              <label htmlFor="checkout-email" className="mb-2 block text-sm">Email</label>
+              </div>
+              <div>
+              <label htmlFor="checkout-email" className="mb-1 block text-xs sm:text-sm">Email</label>
               <input
                 id="checkout-email"
                 type="email"
                 required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                    value={emailCheckout}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      setEmailEditado(true);
+                    }}
                 placeholder="tu@email.com"
-                className="mb-4 w-full border border-carbon-line bg-carbon px-3 py-2 text-sm outline-none focus:border-ember"
+                className="mb-2 w-full border border-carbon-line bg-carbon px-2 py-1.5 text-sm outline-none focus:border-ember sm:mb-4 sm:px-3 sm:py-2"
               />
-              <fieldset className="mb-4">
-                <legend className="mb-2 text-sm font-medium">¿Cómo querés pagar?</legend>
-                <div className="flex flex-col gap-2">
+              </div>
+              </div>
+              <fieldset className="mb-2 sm:mb-4">
+                <legend className="mb-1 text-sm font-medium sm:mb-2">¿Cómo querés pagar?</legend>
+                <div className="grid grid-cols-2 gap-2">
                   {mediosPago.map((medio) => (
                     <label
                       key={medio.id}
-                      className={`border p-3 ${medio.disponible ? "cursor-pointer border-carbon-line hover:border-ember" : "cursor-not-allowed border-carbon-line opacity-50"}`}
+                      className={`border p-2 sm:p-3 ${medio.disponible ? "cursor-pointer border-carbon-line hover:border-ember" : "cursor-not-allowed border-carbon-line opacity-50"}`}
                     >
                       <span className="flex items-start gap-2">
                         <input
@@ -436,17 +550,17 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
                 </div>
               </fieldset>
               {/* El servidor vuelve a validar precio y stock al registrar el pedido. */}
-              <div className="sticky bottom-0 -mx-4 -mb-4 mt-4 border-t border-carbon-line bg-carbon-raised px-4 pb-4 pt-3 sm:-mx-5 sm:-mb-5 sm:px-5 sm:pb-5">
-                <div className="mb-3 space-y-1 text-sm">
+              <div className="sticky bottom-0 -mx-3 -mb-3 mt-2 border-t border-carbon-line bg-carbon-raised px-3 pb-3 pt-2 sm:-mx-5 sm:-mb-5 sm:mt-4 sm:px-5 sm:pb-5">
+                <div className="mb-2 space-y-0.5 text-sm sm:mb-3 sm:space-y-1">
                   <div className="flex items-center justify-between"><span>Productos</span><span>{formatearPrecio(subtotal)}</span></div>
                   <div className="flex items-center justify-between"><span>Envío</span><span>{formaEntrega === "retiro" ? "Gratis" : cotizacion ? formatearPrecio(costoEnvio) : "A calcular"}</span></div>
-                  <div className="flex items-center justify-between border-t border-carbon-line pt-2 text-lg font-semibold"><span>Total</span><span>{formatearPrecio(total)}</span></div>
+                  <div className="flex items-center justify-between border-t border-carbon-line pt-1 text-base font-semibold sm:pt-2 sm:text-lg"><span>Total</span><span>{formatearPrecio(total)}</span></div>
                 </div>
                 {error && <p role="alert" className="mb-3 border border-ember/40 bg-ember/10 p-3 text-sm text-ember">{error}</p>}
                 <button
                   type="submit"
-                  disabled={checkoutCargando || catalogoCargando || hayLineasSinCatalogo}
-                  className="w-full bg-ember px-6 py-3 text-sm font-semibold uppercase tracking-wide text-carbon transition-colors hover:bg-ember-bright disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={checkoutCargando || catalogoCargando || hayLineasSinCatalogo || hayStockInsuficiente}
+                  className="w-full bg-ember px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-carbon transition-colors hover:bg-ember-bright disabled:cursor-not-allowed disabled:opacity-60 sm:py-3"
                 >
                   {checkoutCargando
                     ? "Creando pedido…"

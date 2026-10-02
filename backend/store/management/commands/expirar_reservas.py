@@ -6,13 +6,13 @@ from store.orders import expirar_reserva_pedido
 
 
 class Command(BaseCommand):
-    help = "Cancela pedidos manuales vencidos y libera el stock reservado."
+    help = "Cancela pedidos pendientes vencidos y libera el stock reservado."
 
     def handle(self, *args, **options):
         ids = list(
             Pedido.objects.filter(
                 estado="pendiente",
-                proveedor_pago__in=("transferencia", "local"),
+                proveedor_pago__in=("mercado_pago", "transferencia", "local"),
                 stock_reservado=True,
                 stock_reservado_hasta__lte=timezone.now(),
             ).values_list("id", flat=True)

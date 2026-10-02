@@ -1,7 +1,8 @@
 from django.contrib import admin, messages
 
 from .models import Combo, ItemPedido, Pedido, Producto, SolicitudAtencion
-from .orders import procesar_pedido_manual
+from .orders import completar_pedido_mercado_pago, procesar_pedido_manual, resolver_revision_pago
+from .views import procesar_notificacion_pago
 
 
 admin.site.site_header = "Administración de Ragnar Suplementos"
@@ -81,10 +82,17 @@ class PedidoAdmin(admin.ModelAdmin):
     search_fields = ("nombre_comprador", "telefono_comprador", "email_comprador", "pago_id", "preferencia_id")
     readonly_fields = (
         "estado", "stock_reservado", "stock_reservado_hasta", "nombre_comprador", "telefono_comprador", "email_comprador", "total", "costo_envio", "distancia_envio_km",
-        "direccion_entrega", "forma_entrega", "preferencia_id", "pago_id", "creado", "actualizado",
+        "direccion_entrega", "forma_entrega", "preferencia_id", "pago_id", "pagos_adicionales", "creado", "actualizado",
     )
     inlines = (ItemPedidoInline,)
-    actions = ("confirmar_pago_manual", "cancelar_pedido_manual")
+    actions = (
+        "confirmar_pago_manual",
+        "cancelar_pedido_manual",
+        "completar_mercado_pago_revisar_stock",
+        "reconciliar_revision_pago",
+        "cerrar_revision_sin_pago",
+        "cerrar_revision_reembolsado",
+    )
 
     @admin.action(description="Marcar pago manual como recibido y completar pedido")
     def confirmar_pago_manual(self, request, queryset):
@@ -113,6 +121,57 @@ class PedidoAdmin(admin.ModelAdmin):
                 self.message_user(request, f"Pedido #{pedido.pk}: {mensaje}", level=messages.WARNING)
         if cancelados:
             self.message_user(request, f"Se cancelaron {cancelados} pedido(s).", level=messages.SUCCESS)
+
+    @admin.action(description="Completar pedido de Mercado Pago tras reponer stock")
+    def completar_mercado_pago_revisar_stock(self, request, queryset):
+        completados = 0
+        for pedido in queryset:
+            ok, mensaje = completar_pedido_mercado_pago(pedido.pk)
+            if ok:
+                completados += 1
+            else:
+                self.message_user(request, f"Pedido #{pedido.pk}: {mensaje}", level=messages.WARNING)
+        if completados:
+            self.message_user(
+                request,
+                f"Se completaron {completados} pedido(s) pagados y se descontó el inventario.",
+                level=messages.SUCCESS,
+            )
+
+    @admin.action(description="Consultar en Mercado Pago los pedidos en revisión")
+    def reconciliar_revision_pago(self, request, queryset):
+        for pedido in queryset.filter(proveedor_pago="mercado_pago", estado="revision_pago"):
+            if not pedido.pago_id:
+                self.message_user(request, f"Pedido #{pedido.pk}: no tiene ID de pago; buscá el pedido en Mercado Pago.", level=messages.WARNING)
+                continue
+            actualizado, resultado = procesar_notificacion_pago(pedido.pago_id, pedido.pk)
+            if actualizado:
+                self.message_user(request, f"Pedido #{pedido.pk}: estado actual {actualizado.get_estado_display().lower()}.", level=messages.INFO)
+            else:
+                self.message_user(request, f"Pedido #{pedido.pk}: no se pudo reconciliar ({resultado}).", level=messages.WARNING)
+
+    @admin.action(description="Cerrar revisión sin pago (verificá primero en Mercado Pago)")
+    def cerrar_revision_sin_pago(self, request, queryset):
+        self._cerrar_revision(request, queryset, "cancelado")
+
+    @admin.action(description="Marcar revisión reembolsada (confirmá primero la devolución)")
+    def cerrar_revision_reembolsado(self, request, queryset):
+        self._cerrar_revision(
+            request,
+            queryset.filter(estado__in=("revision_pago", "revisar_stock")),
+            "reembolsado",
+        )
+
+    def _cerrar_revision(self, request, queryset, estado_final):
+        estados = ("revision_pago", "revisar_stock") if estado_final == "reembolsado" else ("revision_pago",)
+        for pedido in queryset.filter(proveedor_pago="mercado_pago", estado__in=estados):
+            ok, mensaje = resolver_revision_pago(pedido.pk, estado_final)
+            if ok:
+                actualizado = Pedido.objects.get(pk=pedido.pk)
+                self.log_change(request, actualizado, f"Revisión Mercado Pago cerrada como {estado_final} tras verificación manual.")
+                self.message_user(request, f"Pedido #{pedido.pk}: {mensaje}", level=messages.SUCCESS)
+            else:
+                self.message_user(request, f"Pedido #{pedido.pk}: {mensaje}", level=messages.WARNING)
 
 
 @admin.register(SolicitudAtencion)

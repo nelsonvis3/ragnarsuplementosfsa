@@ -76,6 +76,9 @@ class Pedido(models.Model):
         ("rechazado", "Rechazado"),
         ("cancelado", "Cancelado"),
         ("revisar_stock", "Revisar stock"),
+        ("revision_pago", "Revisar pago"),
+        ("reembolsado", "Reembolsado"),
+        ("contracargo", "Contracargo"),
     ]
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     nombre_comprador = models.CharField(max_length=150)
@@ -91,7 +94,11 @@ class Pedido(models.Model):
     distancia_envio_km = models.DecimalField(max_digits=7, decimal_places=1, null=True, blank=True)
     costo_envio = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     preferencia_id = models.CharField(max_length=120, blank=True)
+    preferencia_url = models.URLField(max_length=1000, blank=True)
+    checkout_key = models.UUIDField(unique=True, null=True, blank=True, editable=False)
+    checkout_payload_hash = models.CharField(max_length=64, blank=True)
     pago_id = models.CharField(max_length=120, blank=True, unique=True, null=True)
+    pagos_adicionales = models.JSONField(default=list, blank=True)
     creado = models.DateTimeField(auto_now_add=True)
     actualizado = models.DateTimeField(auto_now=True)
 
@@ -133,7 +140,7 @@ class SolicitudAtencion(models.Model):
 
 class ItemPedido(models.Model):
     pedido = models.ForeignKey(Pedido, related_name="items", on_delete=models.CASCADE)
-    producto = models.ForeignKey(Producto, null=True, blank=True, on_delete=models.SET_NULL)
+    producto = models.ForeignKey(Producto, null=True, blank=True, on_delete=models.PROTECT)
     combo = models.ForeignKey(Combo, null=True, blank=True, on_delete=models.SET_NULL)
     nombre = models.CharField(max_length=200)
     sabor = models.CharField(max_length=100, blank=True)

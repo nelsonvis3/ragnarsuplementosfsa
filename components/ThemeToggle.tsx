@@ -1,20 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Sun, Moon } from "lucide-react";
 
-export default function ThemeToggle() {
-  const [esClaro, setEsClaro] = useState(false);
+function subscribe(callback: () => void) {
+  const observer = new MutationObserver(callback);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+}
 
-  // Sincroniza el estado del botón con la clase que ya haya en <html>
-  // (aplicada por el script inline en layout.tsx antes de la hidratación).
-  useEffect(() => {
-    setEsClaro(document.documentElement.classList.contains("light"));
-  }, []);
+function getSnapshot() {
+  return document.documentElement.classList.contains("light");
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
+export default function ThemeToggle() {
+  const esClaro = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   function alternarTema() {
-    const nuevoEsClaro = !esClaro;
-    setEsClaro(nuevoEsClaro);
+    const nuevoEsClaro = !document.documentElement.classList.contains("light");
     document.documentElement.classList.toggle("light", nuevoEsClaro);
     localStorage.setItem("ragnar_tema", nuevoEsClaro ? "light" : "dark");
   }

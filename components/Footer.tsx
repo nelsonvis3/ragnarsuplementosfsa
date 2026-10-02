@@ -29,7 +29,7 @@ export default function Footer() {
               className="flex items-center gap-2 text-sm text-bone-dim transition-colors hover:text-ember"
             >
               <Phone size={16} />
-              +54 11 7062-5896
+              +54 9 3704 696533
             </Link>
             <Link
               href="mailto:adansiv16@gmail.com"
@@ -81,7 +81,8 @@ export default function Footer() {
       </div>
 
       <p className="border-t border-carbon-line py-5 text-center text-xs text-bone-dim">
-        &copy; 2026 Ragnar Suplementos. Todos los derechos reservados.
+        &copy; 2026 Ragnar Suplementos.
+        Pagina hecha por: nelsonsivisstum3@gmail.com
       </p>
     </footer>
   );
