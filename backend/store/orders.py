@@ -36,6 +36,19 @@ def expirar_reserva_pedido(pedido_id):
         return True
 
 
+def expirar_reservas_vencidas():
+    """Libera reservas vencidas sin depender de un cron externo."""
+    ids = list(
+        Pedido.objects.filter(
+            estado="pendiente",
+            proveedor_pago__in=("mercado_pago", "transferencia", "local"),
+            stock_reservado=True,
+            stock_reservado_hasta__lte=timezone.now(),
+        ).values_list("id", flat=True)
+    )
+    return sum(expirar_reserva_pedido(pedido_id) for pedido_id in ids)
+
+
 def _cantidades_del_pedido(pedido):
     cantidades = {}
     for item in pedido.items.select_related("producto", "combo"):

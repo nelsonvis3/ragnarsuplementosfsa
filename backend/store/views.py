@@ -29,7 +29,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .emails import enviar_confirmacion_pedido, instrucciones_pago
 from .models import Combo, ItemPedido, Pedido, Producto, SolicitudAtencion
-from .orders import _cantidades_del_pedido, resolver_revision_pago
+from .orders import _cantidades_del_pedido, expirar_reservas_vencidas, resolver_revision_pago
 from .shipping import (
     ErrorCotizacionEnvio,
     calcular_distancia_ruta_km,
@@ -161,6 +161,7 @@ def combo_json(combo):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def productos(request):
+    expirar_reservas_vencidas()
     qs = Producto.objects.filter(activo=True).order_by("id")
     categoria = request.query_params.get("categoria")
     if categoria and categoria != "todos":
@@ -171,6 +172,7 @@ def productos(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def producto_detalle(request, slug):
+    expirar_reservas_vencidas()
     try:
         producto = Producto.objects.get(slug=slug, activo=True)
     except Producto.DoesNotExist:
@@ -181,12 +183,14 @@ def producto_detalle(request, slug):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def combos(request):
+    expirar_reservas_vencidas()
     return Response([combo_json(c) for c in Combo.objects.filter(activo=True).order_by("id").prefetch_related("productos")])
 
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def combo_detalle(request, slug):
+    expirar_reservas_vencidas()
     try:
         combo = Combo.objects.prefetch_related("productos").get(slug=slug, activo=True)
     except Combo.DoesNotExist:
@@ -346,6 +350,7 @@ def respuesta_checkout_existente(pedido, hash_payload):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def crear_preferencia(request):
+    expirar_reservas_vencidas()
     serializer = CheckoutSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     medio_pago = serializer.validated_data["medio_pago"]
