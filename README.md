@@ -183,7 +183,7 @@ backend/config/              Configuración, URLs y entradas WSGI/ASGI de Django
 backend/store/               Modelos, vistas, pedidos, envíos, correos, admin y migraciones
 backend/store/management/    Comandos para catálogo y expiración de reservas
 scripts/render-build.mjs     Configura la URL interna de Django durante la compilación en Render
-render.yaml                  Servicios Render: frontend, API, PostgreSQL y cron de reservas
+render.yaml                  Servicios Render gratuitos: frontend, API y PostgreSQL
 ```
 
 ### Modelos de datos
@@ -198,19 +198,20 @@ Las migraciones que definen la evolución del esquema están en `backend/store/m
 
 ## Despliegue en Render
 
-`render.yaml` declara cuatro recursos: API Django, sitio Next.js, base PostgreSQL y un cron que ejecuta `expirar_reservas` cada 15 minutos. Para usarlo, conectá el repositorio en Render y creá un Blueprint con ese archivo.
+`render.yaml` declara tres recursos gratuitos: API Django, sitio Next.js y base PostgreSQL. Para usarlo, conectá el repositorio en Render y creá un Blueprint con ese archivo.
 
-El despliegue aplica migraciones y ejecuta `ensure_catalogo` antes de iniciar la API. El build del frontend toma `DJANGO_API_HOST` y lo convierte en `NEXT_PUBLIC_API_URL`. El Blueprint define las versiones de Node y Python utilizadas por sus servicios.
+El despliegue aplica migraciones y ejecuta `ensure_catalogo` antes de iniciar la API. El build del frontend toma `DJANGO_API_HOST` y lo convierte en `NEXT_PUBLIC_API_URL`. El Blueprint define las versiones de Node y Python utilizadas por sus servicios. Las reservas vencidas se liberan cuando hay actividad en el catálogo o se confirma una compra; no hay un cron en el nivel gratuito.
 
 Después del primer despliegue:
 
-1. Configurá las variables secretas desde el panel de Render; el Blueprint deja los datos de transferencia sin sincronizar para que los completes.
-2. Creá una cuenta administrativa ejecutando `python backend/manage.py createsuperuser` en la consola del servicio API.
-3. Entrá a `/admin/`, revisá el catálogo inicial y cargá el stock real antes de habilitar ventas.
-4. Configurá Mercado Pago, SMTP y Cloudinary solo si vas a utilizar esas integraciones. Para Mercado Pago, habilitá `MP_ENABLED` únicamente después de definir credenciales y webhook público.
+1. Completá `PAGO_ALIAS`, `PAGO_CVU` y `PAGO_TITULAR` en el panel de Render si vas a aceptar transferencias. Mercado Pago queda deshabilitado hasta que configures sus credenciales y webhook.
+2. Creá el usuario administrativo desde tu equipo, ejecutando `python backend/manage.py createsuperuser` con `DATABASE_URL` apuntando a la URL externa de PostgreSQL que muestra Render. El servicio gratuito no ofrece consola Shell; no guardes esa URL en Git ni la compartas por chat.
+3. Entrá a `/admin/`, revisá el catálogo inicial y cargá el stock real antes de habilitar ventas. `ensure_catalogo` crea productos con stock cero.
+4. Configurá Cloudinary si necesitás administrar imágenes desde el panel. El nivel gratis de Render bloquea conexiones salientes SMTP en los puertos 25, 465 y 587.
 5. Confirmá `FRONTEND_URL`, CORS y el dominio de API para que coincidan con los dominios públicos de Render.
 
 No habilites pedidos con inventario sin cargar ni validar el stock real: el catálogo inicial se crea intencionalmente con stock cero.
+La base PostgreSQL gratuita vence a los 30 días y no tiene backups automáticos; exportá los datos y migrá a un plan persistente antes de esa fecha si necesitás conservarlos.
 
 ## Operación del backend
 
@@ -221,4 +222,4 @@ python backend/manage.py createsuperuser
 python backend/manage.py expirar_reservas
 ```
 
-`expirar_reservas` cancela pedidos pendientes vencidos y libera sus unidades reservadas. Render lo ejecuta automáticamente con el cron definido en `render.yaml`; en otro hosting se debe programar una tarea equivalente.
+`expirar_reservas` cancela pedidos pendientes vencidos y libera sus unidades reservadas. En Render gratuito la misma operación se ejecuta cuando el API recibe actividad de catálogo o checkout; en otros hostings se puede programar con cron.
