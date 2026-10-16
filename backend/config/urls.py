@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.urls import path
 
 from store import views
+from store.password_reset import recuperar_contrasena, restablecer_contrasena
+from store.email_confirmation import confirmar_email, reenviar_confirmacion
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -9,6 +11,10 @@ urlpatterns = [
     path("auth/registro", views.registro),
     path("auth/login", views.login),
     path("auth/perfil", views.perfil),
+    path("auth/email/confirmar", confirmar_email),
+    path("auth/email/reenviar", reenviar_confirmacion),
+    path("auth/contrasena/recuperar", recuperar_contrasena),
+    path("auth/contrasena/restablecer", restablecer_contrasena),
     path("productos/", views.productos),
     path("productos/<slug:slug>/", views.producto_detalle),
     path("combos/", views.combos),

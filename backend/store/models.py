@@ -1,6 +1,23 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 from cloudinary.models import CloudinaryField
+
+
+class VerificacionEmail(models.Model):
+    usuario = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="verificacion_email")
+    email = models.EmailField(max_length=254)
+    codigo = models.UUIDField(default=uuid.uuid4, editable=False)
+    creado = models.DateTimeField(auto_now_add=True)
+    confirmado_en = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "confirmación de email"
+        verbose_name_plural = "confirmaciones de email"
+
+    def __str__(self):
+        return f"{self.email} ({'confirmado' if self.confirmado_en else 'pendiente'})"
 
 
 class Producto(models.Model):

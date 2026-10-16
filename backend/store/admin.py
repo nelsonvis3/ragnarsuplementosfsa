@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 
-from .models import Combo, ItemPedido, Pedido, Producto, SolicitudAtencion
+from .models import Combo, ItemPedido, Pedido, Producto, SolicitudAtencion, VerificacionEmail
 from .orders import completar_pedido_mercado_pago, procesar_pedido_manual, resolver_revision_pago
 from .views import procesar_notificacion_pago
 
@@ -8,6 +8,20 @@ from .views import procesar_notificacion_pago
 admin.site.site_header = "Administración de Ragnar Suplementos"
 admin.site.site_title = "Ragnar | Administración"
 admin.site.index_title = "Gestión de la tienda"
+
+
+@admin.register(VerificacionEmail)
+class VerificacionEmailAdmin(admin.ModelAdmin):
+    list_display = ("email", "usuario", "creado", "confirmado_en")
+    list_filter = ("confirmado_en",)
+    search_fields = ("email", "usuario__username")
+    readonly_fields = ("usuario", "email", "codigo", "creado", "confirmado_en")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Producto)

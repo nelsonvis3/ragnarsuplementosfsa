@@ -6,11 +6,19 @@ export interface Usuario {
   id: number;
   nombre_completo: string;
   email: string;
+  puede_administrar_catalogo: boolean;
+  puede_recuperar_contrasena: boolean;
 }
 
 export interface AuthResponse {
   token: string;
   usuario: Usuario;
+}
+
+export interface RegistroResponse {
+  email: string;
+  correo_enviado: boolean;
+  detail: string;
 }
 
 export interface ItemCheckout {
@@ -161,11 +169,19 @@ export async function registrarUsuario(
   nombreCompleto: string,
   email: string,
   password: string
-): Promise<AuthResponse> {
-  return solicitar<AuthResponse>("/auth/registro", {
+): Promise<RegistroResponse> {
+  return solicitar<RegistroResponse>("/auth/registro", {
     method: "POST",
     body: JSON.stringify({ nombre_completo: nombreCompleto, email, password }),
   });
+}
+
+export async function confirmarEmail(token: string): Promise<{ detail: string }> {
+  return solicitar("/auth/email/confirmar", { method: "POST", body: JSON.stringify({ token }) });
+}
+
+export async function reenviarConfirmacionEmail(email: string): Promise<{ detail: string }> {
+  return solicitar("/auth/email/reenviar", { method: "POST", body: JSON.stringify({ email }) });
 }
 
 export async function iniciarSesion(email: string, password: string): Promise<AuthResponse> {
@@ -178,6 +194,20 @@ export async function iniciarSesion(email: string, password: string): Promise<Au
 export async function obtenerPerfil(token: string): Promise<Usuario> {
   return solicitar<Usuario>("/auth/perfil", {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function solicitarRecuperacionContrasena(email: string): Promise<{ detail: string }> {
+  return solicitar("/auth/contrasena/recuperar", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function restablecerContrasena(uid: string, token: string, password: string, confirmacion: string): Promise<{ detail: string }> {
+  return solicitar("/auth/contrasena/restablecer", {
+    method: "POST",
+    body: JSON.stringify({ uid, token, password, password_confirmacion: confirmacion }),
   });
 }
 

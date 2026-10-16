@@ -1,8 +1,57 @@
 import os
+from email.message import MIMEPart
 from html import escape
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+
+
+def enviar_bienvenida_registro(user, enlace):
+    contexto = {"nombre": user.first_name, "enlace": enlace}
+    mensaje = EmailMultiAlternatives(
+        subject="Bienvenido/a a Ragnar. Confirmá tu e-mail",
+        body=render_to_string("store/emails/bienvenida.txt", contexto),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+    mensaje.attach_alternative(render_to_string("store/emails/bienvenida.html", contexto), "text/html")
+    logo = MIMEPart()
+    logo.set_content(
+        (settings.ROOT_DIR / "public" / "logo.png").read_bytes(),
+        maintype="image", subtype="png", disposition="inline", cid="<ragnar-logo>", filename="ragnar-logo.png",
+    )
+    mensaje.attach(logo)
+    mensaje.send(fail_silently=False)
+
+
+def enviar_recuperacion_contrasena(user, enlace):
+    nombre = user.first_name or ""
+    saludo = f"Hola, {nombre}." if nombre else "Hola."
+    texto = (
+        f"{saludo}\n\nRecibimos una solicitud para cambiar tu contraseña de Ragnar Suplementos.\n"
+        f"Abrí este enlace para elegir una nueva:\n\n{enlace}\n\n"
+        "El enlace vence en una hora y se puede usar una sola vez.\n"
+        "Si no pediste este cambio, ignorá el correo: tu contraseña sigue siendo la misma."
+    )
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px">
+      <h1 style="font-size:24px">Recuperar tu contraseña</h1>
+      <p>{escape(saludo)}</p>
+      <p>Recibimos una solicitud para cambiar tu contraseña de Ragnar Suplementos.</p>
+      <p><a href="{escape(enlace, quote=True)}">Elegir una nueva contraseña</a></p>
+      <p>El enlace vence en una hora y se puede usar una sola vez.</p>
+      <p>Si no pediste este cambio, ignorá el correo: tu contraseña sigue siendo la misma.</p>
+    </div>
+    """
+    mensaje = EmailMultiAlternatives(
+        subject="Recuperá tu contraseña — Ragnar Suplementos",
+        body=texto,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+    mensaje.attach_alternative(html, "text/html")
+    mensaje.send(fail_silently=False)
 
 
 def instrucciones_pago(medio, pago_confirmado=False, forma_entrega="retiro"):
