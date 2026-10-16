@@ -56,8 +56,8 @@ class Combo(models.Model):
 
     @property
     def stock(self):
-        stocks = list(self.productos.filter(activo=True).values_list("stock", flat=True))
-        return min(stocks) if stocks else 0
+        productos = list(self.productos.all())
+        return min((p.stock for p in productos), default=0) if all(p.activo for p in productos) else 0
 
 
 class Pedido(models.Model):
