@@ -136,7 +136,7 @@ def producto_json(producto):
         "nombre": producto.nombre,
         "categoria": producto.categoria,
         "precio": float(producto.precio),
-        "imagen": producto.imagen_archivo.url if producto.imagen_archivo else producto.imagen,
+        "imagen": producto.imagen_archivo.build_url(secure=True) if producto.imagen_archivo else producto.imagen or "/logo-ember.png",
         "descripcion": producto.descripcion,
         "sabores": producto.sabores,
         "stock": producto.stock,
@@ -144,14 +144,14 @@ def producto_json(producto):
 
 
 def combo_json(combo):
-    productos = list(combo.productos.filter(activo=True))
+    productos = list(combo.productos.all())
     return {
         "id": combo.id,
         "slug": combo.slug,
         "nombre": combo.nombre,
         "descripcion": combo.descripcion,
         "precio": float(combo.precio),
-        "imagen": combo.imagen_archivo.url if combo.imagen_archivo else combo.imagen,
+        "imagen": combo.imagen_archivo.build_url(secure=True) if combo.imagen_archivo else combo.imagen or "/logo-ember.png",
         "productosIds": [producto.id for producto in productos],
         "productos": [producto_json(producto) for producto in productos],
         "stock": min((producto.stock for producto in productos), default=0),
@@ -184,7 +184,8 @@ def producto_detalle(request, slug):
 @permission_classes([AllowAny])
 def combos(request):
     expirar_reservas_vencidas()
-    return Response([combo_json(c) for c in Combo.objects.filter(activo=True).order_by("id").prefetch_related("productos")])
+    disponibles = Combo.objects.filter(activo=True, productos__isnull=False).exclude(productos__activo=False).distinct()
+    return Response([combo_json(c) for c in disponibles.order_by("id").prefetch_related("productos")])
 
 
 @api_view(["GET"])
@@ -192,7 +193,7 @@ def combos(request):
 def combo_detalle(request, slug):
     expirar_reservas_vencidas()
     try:
-        combo = Combo.objects.prefetch_related("productos").get(slug=slug, activo=True)
+        combo = Combo.objects.filter(productos__isnull=False).exclude(productos__activo=False).distinct().prefetch_related("productos").get(slug=slug, activo=True)
     except Combo.DoesNotExist:
         return Response({"detail": "Combo no encontrado."}, status=404)
     return Response(combo_json(combo))
@@ -429,10 +430,13 @@ def crear_preferencia(request):
                         raise serializers.ValidationError({"detail": f"El sabor elegido para {nombre} ya no está disponible."})
                     cantidades_stock[obj.id] = cantidades_stock.get(obj.id, 0) + linea["cantidad"]
                 else:
-                    obj = Combo.objects.prefetch_related("productos").get(pk=linea["id"], activo=True)
+                    obj = Combo.objects.select_for_update().prefetch_related("productos").get(pk=linea["id"], activo=True)
                     nombre, precio = obj.nombre, obj.precio
                     producto, combo = None, obj
-                    componentes_ids = list(obj.productos.filter(activo=True).values_list("id", flat=True))
+                    componentes = list(obj.productos.all())
+                    if any(not componente.activo for componente in componentes):
+                        raise serializers.ValidationError({"detail": f"El combo {nombre} tiene productos que ya no están disponibles."})
+                    componentes_ids = [componente.pk for componente in componentes]
                     componentes_combo = componentes_ids
                     for producto_id in componentes_ids:
                         cantidades_stock[producto_id] = cantidades_stock.get(producto_id, 0) + linea["cantidad"]
@@ -462,6 +466,8 @@ def crear_preferencia(request):
             if len(productos_bloqueados) != len(cantidades_stock):
                 raise serializers.ValidationError({"detail": "Uno de los productos dejó de estar disponible."})
             for producto_stock in productos_bloqueados:
+                if not producto_stock.activo:
+                    raise serializers.ValidationError({"detail": f"{producto_stock.nombre} ya no está disponible."})
                 if producto_stock.stock < cantidades_stock[producto_stock.id]:
                     raise serializers.ValidationError({"detail": f"Stock insuficiente para {producto_stock.nombre}."})
             reservar_stock = True
