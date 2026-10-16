@@ -99,10 +99,7 @@ El flujo de Mercado Pago no tiene tests automáticos y necesita credenciales rea
 
 ## Qué aprendí
 
-<!-- Nelson: respondé con tus palabras, 3-5 líneas:
-- ¿Qué fue lo que más te costó y cómo lo resolviste?
-- ¿Qué harías distinto si lo empezaras hoy?
-- ¿Qué parte te gustaría explicar en una entrevista? -->
+Aprendí que el checkout no termina cuando el cliente se va a pagar: hay reintentos, pagos que llegan tarde y reservas que vencen. Los combos me obligaron a pensar el stock como algo compartido entre productos y no como un número por artículo.
 
 ## Licencia
 
