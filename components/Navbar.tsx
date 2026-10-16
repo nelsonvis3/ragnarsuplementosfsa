@@ -12,7 +12,6 @@ import Logo from "@/components/Logo";
 
 const LINKS_NAV = [
   { href: "/productos", label: "Catálogo", ancla: false },
-  { href: "/atencion?tipo=arrepentimiento", label: "Botón de arrepentimiento", ancla: false },
   { href: "/#nosotros", label: "Nosotros", ancla: true },
   { href: "/#contacto", label: "Contacto", ancla: true },
 ];
@@ -115,15 +114,6 @@ export default function Navbar() {
         >
           <Menu size={20} />
         </button>
-      </div>
-
-      <div className="border-t border-carbon-line px-5 py-2 lg:hidden">
-        <Link
-          href="/atencion?tipo=arrepentimiento"
-          className="block text-right text-xs text-bone-dim transition-colors hover:text-bone"
-        >
-          BOTÓN DE ARREPENTIMIENTO
-        </Link>
       </div>
 
       {/* Panel mobile */}

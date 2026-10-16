@@ -1,6 +1,6 @@
-export default function AdvertenciaSuplemento({ compact = false }: { compact?: boolean }) {
+export default function AdvertenciaSuplemento() {
   return (
-    <p className={`border border-carbon-line bg-carbon text-bone-dim ${compact ? "px-2 py-2 text-xs leading-5" : "mt-5 p-4 text-sm leading-6"}`}>
+    <p className="mt-10 border-t border-carbon-line pt-4 text-xs leading-5 text-bone-dim">
       SUPLEMENTA DIETAS INSUFICIENTES. CONSULTE A SU MÉDICO Y/O FARMACÉUTICO.
     </p>
   );

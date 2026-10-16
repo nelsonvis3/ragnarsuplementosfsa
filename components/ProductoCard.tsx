@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { Producto } from "@/types/producto";
-import AdvertenciaSuplemento from "@/components/AdvertenciaSuplemento";
 
 function formatearPrecio(valor: number) {
   return `$${valor.toLocaleString("es-AR")}`;
@@ -84,7 +83,6 @@ export default function ProductoCard({ producto }: { producto: Producto }) {
             )}
           </div>
         </div>
-        {producto.categoria !== "alimentos" && <AdvertenciaSuplemento compact />}
       </div>
     </Link>
   );
