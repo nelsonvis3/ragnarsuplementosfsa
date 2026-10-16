@@ -120,6 +120,10 @@ REST_FRAMEWORK = {
         "registro": "5/hour",
         "login": "10/minute",
         "pago_retorno": "30/hour",
+        "recuperar_contrasena": "5/hour",
+        "restablecer_contrasena": "20/hour",
+        "reenviar_confirmacion": "5/hour",
+        "confirmar_email": "20/hour",
     },
 }
 
@@ -153,7 +157,33 @@ if not DEBUG:
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "CHECK_REVOKE_TOKEN": True,
 }
+
+PASSWORD_RESET_TIMEOUT = 60 * 60
+PASSWORD_RESET_FRONTEND_URL = (
+    os.getenv("PASSWORD_RESET_FRONTEND_URL") or (CORS_ALLOWED_ORIGINS or ["http://localhost:3000"])[0]
+).strip().rstrip("/")
+EMAIL_CONFIRMATION_TIMEOUT = 24 * 60 * 60
+EMAIL_CONFIRMATION_FRONTEND_URL = (
+    os.getenv("EMAIL_CONFIRMATION_FRONTEND_URL") or PASSWORD_RESET_FRONTEND_URL
+).strip().rstrip("/")
+for _nombre, _valor in (
+    ("PASSWORD_RESET_FRONTEND_URL", PASSWORD_RESET_FRONTEND_URL),
+    ("EMAIL_CONFIRMATION_FRONTEND_URL", EMAIL_CONFIRMATION_FRONTEND_URL),
+):
+    _frontend = urlparse(_valor)
+    if (
+        _frontend.scheme not in {"http", "https"}
+        or not _frontend.hostname
+        or _frontend.username
+        or _frontend.password
+        or _frontend.path
+        or _frontend.query
+        or _frontend.fragment
+        or (not DEBUG and _frontend.scheme != "https")
+    ):
+        raise RuntimeError(f"{_nombre} debe ser el origen público del frontend, sin rutas ni parámetros.")
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND") or (
     "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend"
@@ -163,4 +193,5 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_TIMEOUT = 15
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Ragnar Suplementos <noreply@localhost>")

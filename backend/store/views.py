@@ -28,7 +28,9 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .emails import enviar_confirmacion_pedido, instrucciones_pago
-from .models import Combo, ItemPedido, Pedido, Producto, SolicitudAtencion
+from .email_confirmation import enviar_enlace_confirmacion
+from .models import Combo, ItemPedido, Pedido, Producto, SolicitudAtencion, VerificacionEmail
+from .permissions import puede_administrar_catalogo, puede_recuperar_contrasena
 from .orders import _cantidades_del_pedido, expirar_reservas_vencidas, resolver_revision_pago
 from .shipping import (
     ErrorCotizacionEnvio,
@@ -58,7 +60,13 @@ class PagoRetornoThrottle(AnonRateThrottle):
 
 
 def usuario_json(user):
-    return {"id": user.id, "nombre_completo": user.first_name or user.get_username(), "email": user.email}
+    return {
+        "id": user.id,
+        "nombre_completo": user.first_name or user.get_username(),
+        "email": user.email,
+        "puede_administrar_catalogo": puede_administrar_catalogo(user),
+        "puede_recuperar_contrasena": puede_recuperar_contrasena(user),
+    }
 
 
 def auth_payload(user):
@@ -87,6 +95,8 @@ def registro(request):
     password = str(request.data.get("password", ""))
     if not nombre or not email or not password:
         return Response({"detail": "Completá nombre, email y contraseña."}, status=400)
+    if len(nombre) > 150 or len(password) > 128:
+        return Response({"detail": "El nombre admite hasta 150 caracteres y la contraseña hasta 128."}, status=400)
     try:
         validate_email(email)
     except DjangoValidationError:
@@ -105,20 +115,39 @@ def registro(request):
         return Response({"password": list(exc.messages)}, status=400)
     try:
         with transaction.atomic():
-            user = User.objects.create_user(username=email, email=email, first_name=nombre, password=password)
+            user = User.objects.create_user(username=email, email=email, first_name=nombre, password=password, is_active=False)
+            verificacion = VerificacionEmail.objects.create(usuario=user, email=email)
     except IntegrityError:
         return Response({"detail": "Ya existe una cuenta con ese email."}, status=400)
-    return Response(auth_payload(user), status=201)
+    enviado = enviar_enlace_confirmacion(verificacion)
+    return Response({
+        "email": email,
+        "correo_enviado": enviado,
+        "detail": "¡Tu cuenta está creada! Revisá tu correo y confirmá tu e-mail para iniciar sesión." if enviado else "Tu cuenta está creada, pero no pudimos enviar el correo. Solicitá un nuevo enlace para confirmar tu e-mail.",
+    }, status=201)
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([LoginThrottle])
 def login(request):
-    email = str(request.data.get("email", "")).strip().lower()
+    identificador = str(request.data.get("email", "")).strip()
     password = str(request.data.get("password", ""))
-    user = authenticate(request, username=email, password=password)
+    user = authenticate(request, username=identificador, password=password)
     if user is None:
+        usuarios = list(User.objects.filter(email__iexact=identificador)[:2])
+        if len(usuarios) == 1:
+            user = authenticate(request, username=usuarios[0].get_username(), password=password)
+    if user is None:
+        candidato = User.objects.filter(username=identificador).first()
+        if candidato is None and len(usuarios) == 1:
+            candidato = usuarios[0]
+        if (
+            candidato and not candidato.is_active and not candidato.is_staff and not candidato.is_superuser
+            and candidato.check_password(password)
+            and VerificacionEmail.objects.filter(usuario=candidato, confirmado_en__isnull=True, email__iexact=candidato.email).exists()
+        ):
+            return Response({"detail": "Confirmá tu e-mail antes de iniciar sesión. Si no recibiste el correo, solicitá un nuevo enlace."}, status=403)
         return Response({"detail": "Email o contraseña incorrectos."}, status=401)
     return Response(auth_payload(user))
 
