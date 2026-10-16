@@ -106,7 +106,7 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
     const producto = productosPorId.get(item.productoId);
     if (!producto) return [];
     const sabor = item.sabor ? producto.sabores.find((opcion) => opcion.nombre === item.sabor) : null;
-    return [{ ...item, nombre: producto.nombre, precio: producto.precio, imagen: sabor?.imagen ?? producto.imagen }];
+    return [{ ...item, nombre: producto.nombre, precio: producto.precio, imagen: sabor?.imagen || producto.imagen }];
   });
   const combosConDatos = combos.flatMap((item) => {
     const combo = combosPorId.get(item.comboId);

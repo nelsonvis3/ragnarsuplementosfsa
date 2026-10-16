@@ -108,7 +108,7 @@ function mensajeError(valor: unknown): string {
 async function solicitar<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
   let respuesta: Response;
   const headers = new Headers(opciones.headers);
-  if (opciones.body && !headers.has("Content-Type")) {
+  if (opciones.body && !(opciones.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   try {
@@ -261,5 +261,55 @@ export async function enviarSolicitudAtencion(datos: SolicitudAtencionInput): Pr
   return solicitar("/atencion/solicitudes", {
     method: "POST",
     body: JSON.stringify(datos),
+  });
+}
+
+interface EstadoAdministracion {
+  activo: boolean;
+  imagen_url: string;
+  actualizado: string;
+}
+
+export type ProductoAdministracion = Producto & EstadoAdministracion;
+export type ComboAdministracion = Omit<Combo, "productos"> & EstadoAdministracion & { productos: number[]; stock: number };
+export type ArticuloAdministracion = ProductoAdministracion | ComboAdministracion;
+export type RecursoAdministracion = "productos" | "combos";
+export interface ImagenSaborUpload { indice: number; archivo: File }
+
+export async function listarCatalogoAdministracion(token: string) {
+  const headers = { Authorization: `Bearer ${token}` };
+  const [productos, combos] = await Promise.all([
+    solicitar<ProductoAdministracion[]>("/administracion/productos/", { headers }),
+    solicitar<ComboAdministracion[]>("/administracion/combos/", { headers }),
+  ]);
+  return { productos, combos };
+}
+
+export async function guardarArticuloAdministracion(
+  token: string,
+  recurso: RecursoAdministracion,
+  id: number | null,
+  datos: Record<string, unknown>,
+  imagen?: File | null,
+  imagenesSabores: ImagenSaborUpload[] = [],
+): Promise<ArticuloAdministracion> {
+  let body: string | FormData = JSON.stringify(datos);
+  if (imagen || imagenesSabores.length) {
+    body = new FormData();
+    body.append("datos", JSON.stringify(datos));
+    if (imagen) body.append("imagen_archivo", imagen);
+    for (const { indice, archivo } of imagenesSabores) body.append(`sabor_imagen_${indice}`, archivo);
+  }
+  return solicitar(`/administracion/${recurso}/${id === null ? "" : `${id}/`}`, {
+    method: id === null ? "POST" : "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body,
+  });
+}
+
+export async function eliminarArticuloAdministracion(token: string, recurso: RecursoAdministracion, id: number): Promise<void> {
+  return solicitar(`/administracion/${recurso}/${id}/`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
   });
 }

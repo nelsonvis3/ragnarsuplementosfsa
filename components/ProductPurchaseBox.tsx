@@ -40,7 +40,7 @@ export default function ProductPurchaseBox({
   const cantidadSaborEnCarrito = itemsEnCarrito.find(
     (item) => item.productoId === producto.id && item.sabor === (saborActivo?.nombre ?? null)
   )?.cantidad ?? 0;
-  const imagenActual = saborActivo ? saborActivo.imagen : producto.imagen;
+  const imagenActual = saborActivo?.imagen || producto.imagen;
 
   function handleAgregar() {
     if (sinStock) return;
