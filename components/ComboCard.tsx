@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Combo } from "@/types/producto";
-import AdvertenciaSuplemento from "@/components/AdvertenciaSuplemento";
 
 function formatearPrecio(valor: number) {
   return `$${valor.toLocaleString("es-AR")}`;
@@ -50,7 +49,6 @@ export default function ComboCard({ combo }: { combo: Combo }) {
             </span>
           )}
         </div>
-        <AdvertenciaSuplemento compact />
       </div>
     </Link>
   );
