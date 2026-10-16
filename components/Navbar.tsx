@@ -3,7 +3,7 @@
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X, ShoppingCart, User, LogOut } from "lucide-react";
+import { Menu, X, ShoppingCart, User, LogOut, Settings } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { useAuthStore } from "@/store/auth-store";
 import CartDrawer from "@/components/CarritoDrawer";
@@ -29,6 +29,8 @@ export default function Navbar() {
 
   const usuario = useAuthStore((state) => state.usuario);
   const cerrarSesion = useAuthStore((state) => state.cerrarSesion);
+  const sesionVerificada = useAuthStore((state) => state.sesionVerificada);
+  const esAdmin = sesionVerificada && usuario?.puede_administrar_catalogo;
 
   return (
     <header className="sticky top-0 z-50 border-b border-carbon-line bg-carbon/95 backdrop-blur">
@@ -67,6 +69,12 @@ export default function Navbar() {
                 <User size={16} />
                 {usuario.nombre_completo.split(" ")[0]}
               </span>
+              {esAdmin && (
+                <Link href="/administracion" className="flex items-center gap-2 text-sm text-ember">
+                  <Settings size={16} />
+                  Administración
+                </Link>
+              )}
               <button
                 onClick={cerrarSesion}
                 aria-label="Cerrar sesión"
@@ -159,16 +167,26 @@ export default function Navbar() {
                     <p className="text-center text-sm text-bone-dim">
                       Hola, {usuario.nombre_completo.split(" ")[0]}
                     </p>
-                    <button
-                      onClick={() => {
-                        cerrarSesion();
-                        setMenuAbierto(false);
-                      }}
-                      className="flex items-center justify-center gap-2 border border-carbon-line px-4 py-3 text-sm"
-                    >
-                      <LogOut size={16} />
-                      Cerrar sesión
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {esAdmin && (
+                        <Link href="/administracion" onClick={() => setMenuAbierto(false)} className="flex flex-1 items-center justify-center gap-2 border border-ember px-3 py-3 text-sm text-ember">
+                          <Settings size={16} />
+                          Administración
+                        </Link>
+                      )}
+                      <button
+                        aria-label="Cerrar sesión"
+                        title="Cerrar sesión"
+                        onClick={() => {
+                          cerrarSesion();
+                          setMenuAbierto(false);
+                        }}
+                        className={`flex items-center justify-center gap-2 self-stretch border border-carbon-line px-4 py-3 text-sm ${esAdmin ? "" : "w-full"}`}
+                      >
+                        <LogOut size={16} />
+                        {!esAdmin && "Cerrar sesión"}
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <Link

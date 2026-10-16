@@ -1,12 +1,19 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import SimpleRouter
 
 from store import views
+from store.catalog_admin import ComboAdminViewSet, ProductoAdminViewSet
 from store.password_reset import recuperar_contrasena, restablecer_contrasena
 from store.email_confirmation import confirmar_email, reenviar_confirmacion
 
+catalogo_router = SimpleRouter()
+catalogo_router.register("productos", ProductoAdminViewSet, basename="administracion-productos")
+catalogo_router.register("combos", ComboAdminViewSet, basename="administracion-combos")
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("administracion/", include(catalogo_router.urls)),
     path("health/", views.health),
     path("auth/registro", views.registro),
     path("auth/login", views.login),
