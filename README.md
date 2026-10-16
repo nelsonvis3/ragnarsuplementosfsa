@@ -89,7 +89,7 @@ Desde `backend/`, con el entorno activado:
 python manage.py test
 ```
 
-Son 52 tests: permisos del panel, alta y edición de productos y combos, subida de imágenes, combos con productos despublicados, reserva de stock en el checkout, confirmación de email y recuperación de contraseña. Cloudinary y el correo están simulados. El frontend se revisa con `npm run lint` y `npx tsc --noEmit`.
+Son 54 tests: permisos del panel, alta y edición de productos y combos, subida de imágenes, combos con productos despublicados, reserva de stock en el checkout, el total calculado con los precios del catálogo, la liberación de reservas vencidas, confirmación de email y recuperación de contraseña. Cloudinary y el correo están simulados. El frontend se revisa con `npm run lint` y `npx tsc --noEmit`.
 
 ## Estado
 
