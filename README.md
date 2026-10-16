@@ -103,4 +103,4 @@ Aprendí que el checkout no termina cuando el cliente se va a pagar: hay reinten
 
 ## Licencia
 
-Todavía no tiene licencia.
+Sin licencia: todos los derechos reservados. El código es público para mostrar el proyecto, pero no se puede reutilizar. La marca, el logo y las fotos de productos son de Ragnar Suplementos.
