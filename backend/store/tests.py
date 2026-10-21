@@ -180,13 +180,13 @@ class AdministracionCatalogoTests(APITestCase):
         self.assertEqual(self.client.get(f"/combos/{self.combo.slug}/").status_code, 404)
         self.assertEqual(self.client.get("/combos/").data, [])
         self.assertEqual(self.client.get(f"/administracion/combos/{self.combo.pk}/").data["stock"], 0)
-        response = self.client.post("/pagos/crear-preferencia", {"checkout_key": str(uuid4()), "items": [{"tipo": "combo", "id": self.combo.pk, "cantidad": 1}], "nombre_comprador": "Comprador", "telefono_comprador": "123456789", "email_comprador": "cliente@example.test", "medio_pago": "local", "forma_entrega": "retiro"}, format="json")
+        response = self.client.post("/pagos/crear-preferencia", {"checkout_key": str(uuid4()), "items": [{"tipo": "combo", "id": self.combo.pk, "cantidad": 1}], "nombre_comprador": "Comprador", "telefono_comprador": "123456789", "email_comprador": "jefe@example.test", "medio_pago": "local", "forma_entrega": "retiro"}, format="json")
         self.assertEqual(response.status_code, 400, response.data)
         self.assertEqual(Pedido.objects.count(), 0)
         self.assertEqual(ItemPedido.objects.count(), 0)
 
     def test_combo_publicado_reserva_stock_y_conserva_sus_componentes(self):
-        response = self.client.post("/pagos/crear-preferencia", {"checkout_key": str(uuid4()), "items": [{"tipo": "combo", "id": self.combo.pk, "cantidad": 2}], "nombre_comprador": "Comprador", "telefono_comprador": "123456789", "email_comprador": "cliente@example.test", "medio_pago": "local", "forma_entrega": "retiro"}, format="json")
+        response = self.client.post("/pagos/crear-preferencia", {"checkout_key": str(uuid4()), "items": [{"tipo": "combo", "id": self.combo.pk, "cantidad": 2}], "nombre_comprador": "Comprador", "telefono_comprador": "123456789", "email_comprador": "jefe@example.test", "medio_pago": "local", "forma_entrega": "retiro"}, format="json")
         self.assertEqual(response.status_code, 201, response.data)
         pedido = Pedido.objects.get(pk=response.data["pedido_id"])
         self.assertTrue(pedido.stock_reservado)
