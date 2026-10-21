@@ -105,6 +105,7 @@ El último comando necesita las dependencias de Python instaladas y el entorno c
 
 - [Endpoints de la API](docs/API.md)
 - [Variables de entorno y despliegue](docs/DESPLIEGUE.md)
+- [Deploy gratuito de prueba: Render + Neon](docs/DESPLIEGUE-GRATIS.md)
 - [Configuración de infraestructura](render.yaml)
 
 ## Uso del código
