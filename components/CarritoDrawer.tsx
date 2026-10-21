@@ -19,7 +19,7 @@ const dinero = (n: number) => "$" + n.toLocaleString("es-AR");
 export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [combosCatalogo, setCombosCatalogo] = useState<Combo[]>([]);
-  const [cargando, setCargando] = useState(false);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(false);
   const cerrarRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -83,8 +83,6 @@ export default function CartDrawer({ abierto, onCerrar }: CartDrawerProps) {
   useEffect(() => {
     if (!abierto) return;
     let active = true;
-    setCargando(true);
-    setError(false);
     Promise.all([listarProductos(), listarCombos()])
       .then(([prods, cmbs]) => {
         if (!active) return;

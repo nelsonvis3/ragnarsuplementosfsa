@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useSyncExternalStore } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { registrarUsuario, iniciarSesion, ApiError, type RegistroResponse } from "@/lib/api";
@@ -14,11 +14,13 @@ const observarHidratacion = () => () => {};
 const clienteListo = () => true;
 const servidorListo = () => false;
 
-export default function LoginPage() {
+function LoginContent() {
   const listo = useSyncExternalStore(observarHidratacion, clienteListo, servidorListo);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const guardarSesion = useAuthStore((state) => state.iniciarSesion);
-  const [modo, setModo] = useState<Modo>("login");
+  const [modoElegido, setModoElegido] = useState<Modo | null>(null);
+  const modo: Modo = modoElegido ?? (searchParams.get("modo") === "registro" ? "registro" : "login");
   const [nombreCompleto, setNombreCompleto] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,12 +30,8 @@ export default function LoginPage() {
   const [cargando, setCargando] = useState(false);
   const [registroPendiente, setRegistroPendiente] = useState<RegistroResponse | null>(null);
 
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("modo") === "registro") setModo("registro");
-  }, []);
-
   function cambiarModo(nuevo: Modo) {
-    setModo(nuevo);
+    setModoElegido(nuevo);
     setError(null);
     setRegistroPendiente(null);
     setPassword("");
@@ -58,7 +56,7 @@ export default function LoginPage() {
       }
       const respuesta = await iniciarSesion(email.trim(), password);
       guardarSesion(respuesta.token, respuesta.usuario);
-      const destino = new URLSearchParams(window.location.search).get("next");
+      const destino = searchParams.get("next");
       router.replace(respuesta.usuario.puede_administrar_catalogo ? "/administracion" : destino === "/carrito" ? "/carrito" : "/");
     } catch (err) {
       setError(err instanceof ApiError ? err.mensaje : "No pudimos conectar con el servidor.");
@@ -162,5 +160,13 @@ export default function LoginPage() {
       </div>
       <p className="text-center text-xs text-bone-dim">Ragnar Suplementos · Acceso seguro a tu cuenta</p>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="flex flex-1 items-center justify-center px-5 py-16 text-sm text-bone-dim">Preparando acceso…</main>}>
+      <LoginContent />
+    </Suspense>
   );
 }

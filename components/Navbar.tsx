@@ -220,10 +220,12 @@ export default function Navbar() {
           document.body
         )}
 
-      <CartDrawer
-        abierto={carritoAbierto}
-        onCerrar={cerrarCarrito}
-      />
+      {carritoAbierto && (
+        <CartDrawer
+          abierto={carritoAbierto}
+          onCerrar={cerrarCarrito}
+        />
+      )}
       </header>
     </>
   );
