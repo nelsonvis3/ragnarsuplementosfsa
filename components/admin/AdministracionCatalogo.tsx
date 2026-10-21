@@ -49,7 +49,7 @@ function AccesoAdministracion() {
   }
 
   return (
-    <section className="mx-auto mt-10 max-w-md border border-carbon-line bg-carbon-raised p-6 sm:p-8">
+    <section className="mx-auto mt-10 max-w-md rounded-2xl border border-carbon-line bg-carbon-raised p-6 sm:p-8">
       <LockKeyhole size={28} className="text-ember" />
       <h2 className="mt-5 font-display text-2xl font-semibold">Acceso administrativo</h2>
       <p className="mt-2 text-sm leading-6 text-bone-dim">Ingresá con la cuenta que administra Ragnar para gestionar el catálogo.</p>

@@ -2,7 +2,8 @@
 
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Menu, X, ShoppingCart, User, LogOut, Settings } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { useAuthStore } from "@/store/auth-store";
@@ -12,13 +13,16 @@ import Logo from "@/components/Logo";
 
 const LINKS_NAV = [
   { href: "/productos", label: "Catálogo", ancla: false },
+  { href: "/combos", label: "Combos", ancla: false },
   { href: "/#nosotros", label: "Nosotros", ancla: true },
-  { href: "/#contacto", label: "Contacto", ancla: true },
+  { href: "/#asesoramiento", label: "Contacto", ancla: true },
 ];
 
 export default function Navbar() {
+  const pathname = usePathname();
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [carritoAbierto, setCarritoAbierto] = useState(false);
+  const cerrarCarrito = useCallback(() => setCarritoAbierto(false), []);
 
   const cantidadCarrito = useCartStore((state) => {
     const cantidadItems = state.items.reduce((total, item) => total + item.cantidad, 0);
@@ -32,8 +36,14 @@ export default function Navbar() {
   const esAdmin = sesionVerificada && usuario?.puede_administrar_catalogo;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-carbon-line bg-carbon/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+    <>
+      {pathname === "/" && !carritoAbierto && (
+        <div className="forge-announce" aria-label="Información de entrega">
+          <b>RAGNAR SUPLEMENTOS</b><span>·</span> ENVÍOS EN FORMOSA CAPITAL <span>·</span> RETIRO EN LOCAL
+        </div>
+      )}
+      <header className="forge-header sticky top-0 z-50">
+      <div className="forge-header-inner mx-auto flex max-w-7xl items-center justify-between px-5 py-3 sm:px-8">
         <Link href="/" className="flex items-center gap-3">
           <Logo
             width={36}
@@ -41,13 +51,13 @@ export default function Navbar() {
             className="h-9 w-auto"
             priority
           />
-          <span className="font-display text-xl font-semibold tracking-wide">
+          <span className="font-display text-xl font-bold tracking-[-.03em] sm:text-2xl">
             RAGNAR
           </span>
         </Link>
 
         {/* Nav desktop — agrupado a la derecha, no centrado */}
-        <nav className="hidden items-center gap-8 lg:flex">
+        <nav className="forge-header-nav hidden items-center gap-8 lg:flex">
           {LINKS_NAV.map((link) => (
             link.ancla ? (
               <a key={link.href} href={link.href} className="text-sm text-bone-dim transition-colors hover:text-bone">
@@ -93,7 +103,9 @@ export default function Navbar() {
           )}
 
           <button
-            aria-label="Ver carrito"
+            aria-label="Abrir vista rápida del carrito"
+            aria-haspopup="dialog"
+            aria-expanded={carritoAbierto}
             onClick={() => setCarritoAbierto(true)}
             className="relative border border-carbon-line px-3 py-2 transition-colors hover:border-ember"
           >
@@ -110,7 +122,7 @@ export default function Navbar() {
         <button
           aria-label="Abrir menú"
           onClick={() => setMenuAbierto(true)}
-          className="border border-carbon-line p-2 lg:hidden"
+          className="rounded-lg border border-carbon-line p-2 lg:hidden"
         >
           <Menu size={20} />
         </button>
@@ -124,7 +136,7 @@ export default function Navbar() {
               className="absolute inset-0 bg-black/60"
               onClick={() => setMenuAbierto(false)}
             />
-            <aside className="fixed right-0 top-0 z-50 h-full w-full max-w-xs border-l border-carbon-line bg-carbon-raised">
+            <aside className="forge-mobile-panel fixed right-0 top-0 z-50 h-full w-full max-w-xs border-l border-carbon-line bg-carbon-raised">
               <div className="flex items-center justify-between border-b border-carbon-line px-5 py-4">
                 <span className="font-display text-sm font-semibold uppercase tracking-wide text-bone-dim">
                   Menú
@@ -210,8 +222,9 @@ export default function Navbar() {
 
       <CartDrawer
         abierto={carritoAbierto}
-        onCerrar={() => setCarritoAbierto(false)}
+        onCerrar={cerrarCarrito}
       />
-    </header>
+      </header>
+    </>
   );
 }

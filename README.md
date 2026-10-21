@@ -1,67 +1,72 @@
 # Ragnar Suplementos
 
-Tienda online para Ragnar, un comercio de suplementos deportivos de Formosa. Los clientes compran productos y combos con retiro en el local o envío en la ciudad, y el local administra el catálogo, los precios, el stock y las fotos desde la misma web.
+**E-commerce Full Stack para una tienda de suplementación deportiva en Formosa, Argentina.**
 
-Demo en preparación · [Caso de estudio](https://nelsonvis-portfolio.vercel.app/proyectos/ragnar-suplementos/)
+Ragnar combina una experiencia de compra responsive con un catálogo administrable, control de stock compartido, cálculo de envíos y distintas formas de pago. La interfaz **Ragnar Forge** prioriza una navegación clara desde el descubrimiento del producto hasta la confirmación del pedido.
 
-![Ficha de un producto con selección de sabor](docs/capturas/producto.jpg)
+## Funcionalidades
 
-> **English summary:** Online store for a sports supplement shop in Formosa, Argentina, built with Next.js and a Django REST API. Combos share stock with the single products, the server recalculates every total, each order reserves stock for 24 hours, and payments go through Mercado Pago, bank transfer or cash. The shop manages its catalog from a web panel.
+**Tienda**
+- Catálogo de productos por categoría, variantes de sabor con imágenes y combos.
+- Tarjetas de producto, búsqueda y filtros; detalle de producto con selección de sabor y cantidad.
+- Carrito persistente con Zustand, vista rápida lateral y checkout en la página `/carrito`.
+- Compra como invitado o con cuenta: registro, confirmación de email y recuperación de contraseña.
+- Retiro en el local o entrega dentro de Formosa, con cotización de envío según distancia.
+- Pago con Mercado Pago (si está configurado), transferencia o efectivo, según disponibilidad.
+- Formulario de asesoramiento y solicitudes de consulta, reclamo o arrepentimiento.
 
-## Qué hace
+**Administración**
+- Panel en `/administracion` para publicar y editar productos, combos, precios, stock y fotografías.
+- Gestión de pedidos y pagos manuales desde Django Admin.
+- Validación del inventario y del importe del pedido en el servidor.
 
-- Catálogo por categoría con sabores (cada sabor puede tener su foto) y combos con precio propio.
-- Carrito guardado en el navegador. Se puede comprar como invitado o con una cuenta; las cuentas confirman el email y pueden recuperar la contraseña.
-- Retiro en el local o envío dentro de Formosa. El servidor ubica la dirección, calcula la ruta y cobra por distancia: gratis hasta 1 km, ARS 1.000 hasta 3 km y así hasta 12 km.
-- Pago con Mercado Pago, transferencia o en el local. Los pagos manuales quedan pendientes hasta que el local los aprueba en Django Admin.
-- Cada pedido reserva el stock durante 24 horas. Si vence o se cancela, las unidades vuelven al inventario.
-- Panel en `/administracion` para cargar productos, combos, precios, stock, publicación y fotos por sabor.
-- Formularios de arrepentimiento, reclamo y consulta.
+## Tecnologías
 
-Un ejemplo: si un combo trae una proteína y una creatina, el combo muestra como stock el menor de los dos, y comprar 2 combos reserva 2 unidades de cada producto.
-
-<p>
-  <img src="docs/capturas/carrito.jpg" width="49%" alt="Carrito con retiro o envío y medios de pago">
-  <img src="docs/capturas/administracion.jpg" width="49%" alt="Panel de administración del catálogo">
-</p>
-
-## Stack
-
-| Parte | Tecnologías |
+| Capa | Tecnologías |
 | --- | --- |
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, Zustand |
-| Backend | Django 6.0, Django REST Framework, Simple JWT |
-| Base de datos | PostgreSQL en producción, SQLite en desarrollo |
-| Servicios | Mercado Pago, Cloudinary, SMTP, Nominatim y OSRM de OpenStreetMap |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
+| Estado | Zustand con persistencia local del carrito |
+| Backend | Python, Django 6, Django REST Framework, Simple JWT |
+| Datos | PostgreSQL en producción; SQLite para desarrollo |
+| Integraciones | Mercado Pago, Cloudinary, SMTP, OpenStreetMap (Nominatim y OSRM) |
 
-## Decisiones técnicas
+## Arquitectura y decisiones técnicas
 
-### El navegador no manda precios
+- **El backend es la fuente de verdad.** El frontend no fija precios finales ni stock: Django vuelve a validar artículos, disponibilidad y totales durante el checkout.
+- **Stock compartido entre productos y combos.** Cada combo consume el inventario de sus componentes, evitando vender dos veces la misma unidad.
+- **Checkout idempotente.** Una clave de intento de compra ayuda a evitar pedidos duplicados ante reintentos o doble clic.
+- **Reservas y conciliación de pagos.** Los pedidos reservan unidades durante un plazo configurable. Las notificaciones de Mercado Pago se validan en el servidor y los casos inconsistentes requieren revisión.
+- **Separación de responsabilidades.** Next.js presenta la experiencia de compra; Django expone las APIs y administra las reglas de negocio.
 
-El carrito vive en el navegador, así que cualquiera puede editarlo. Por eso guarda solo el artículo, el sabor y la cantidad. Al confirmar, `crear_preferencia` en [`backend/store/views.py`](backend/store/views.py) vuelve a leer productos y combos, recalcula el total y bloquea las filas de stock con `select_for_update()` dentro de la misma transacción.
+## Estructura
 
-### Combos sin stock propio
+```text
+app/                 Páginas Next.js: inicio, catálogo, combos, carrito, cuenta
+components/          Interfaz, navegación, formularios y componentes de compra
+store/               Estado de autenticación y carrito
+lib/                 Cliente HTTP de la API Django
+types/               Tipos TypeScript
+public/              Identidad visual e imágenes de productos
+backend/             API REST, modelos, pedidos, pagos, envíos y administración
+docs/                Referencia de API e instrucciones de despliegue
+```
 
-Un combo usa los mismos productos que se venden sueltos. Si tuviera stock propio, la misma unidad se podría vender dos veces. En [`models.py`](backend/store/models.py) el stock del combo es el menor de sus productos (cero si alguno está despublicado), y [`orders.py`](backend/store/orders.py) reserva una unidad de cada componente. Cada línea del pedido guarda la lista de componentes, así el stock se libera bien aunque el combo cambie después.
+## Ejecutar localmente
 
-### Un pedido por intento de compra
+Requisitos: **Node.js 20.9 o superior** y **Python 3.12 o superior**.
 
-Un doble clic o una conexión lenta pueden mandar el mismo pedido dos veces. El carrito genera una `checkout_key` por intento y el servidor la guarda como única en el pedido, junto con un hash del carrito. Si llega repetida con los mismos datos, devuelve el pedido que ya existe; si llega con otro carrito, responde 409.
+**1. Backend**
 
-### Pagos que llegan tarde o con otro importe
-
-Mercado Pago avisa por webhook, puede repetir el aviso o llegar cuando la reserva ya venció. El webhook comprueba la firma, consulta el pago en Mercado Pago y compara moneda e importe con el pedido. Si algo no coincide o ya no hay stock, el pedido pasa a revisión (`revision_pago` o `revisar_stock`) para que lo resuelva una persona.
-
-## Cómo correrlo
-
-Necesitás Python 3.12 o más nuevo y Node.js 20.9 o más nuevo. Sin `DATABASE_URL`, Django usa SQLite.
-
-Backend, desde la raíz:
+Desde la raíz del repositorio:
 
 ```bash
 cp .env.example .env
 python -m venv backend/.venv
-source backend/.venv/bin/activate
+```
+
+Activá el entorno virtual con `source backend/.venv/bin/activate` en Bash/Zsh o con `source backend/.venv/bin/activate.fish` en Fish.
+
+```bash
 pip install -r requirements.txt
 python backend/manage.py migrate
 python backend/manage.py ensure_catalogo
@@ -69,7 +74,11 @@ python backend/manage.py createsuperuser
 python backend/manage.py runserver
 ```
 
-Frontend, en otra terminal:
+Sin `DATABASE_URL`, Django usa SQLite. `ensure_catalogo` puede preparar artículos con stock cero; las cantidades reales se configuran desde administración.
+
+**2. Frontend**
+
+En otra terminal, también desde la raíz:
 
 ```bash
 npm ci
@@ -77,30 +86,31 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Abrir http://localhost:3000. `ensure_catalogo` carga 14 productos y 5 combos con stock en cero; el stock se carga entrando con el superusuario a `/administracion`. En desarrollo los mails, incluido el link para confirmar una cuenta nueva, salen en la terminal de Django.
+Abrí **http://localhost:3000**. La API utiliza por defecto **http://127.0.0.1:8000**.
 
-Las variables y el despliegue están en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md) y la API en [docs/API.md](docs/API.md).
+> Podés visualizar el diseño del frontend sin iniciar Django, pero el catálogo dinámico, el carrito con precios actualizados, el formulario y el checkout necesitan la API activa.
 
-## Tests
-
-Desde `backend/`, con el entorno activado:
+## Verificaciones
 
 ```bash
-python manage.py test
+npm run lint
+npx tsc --noEmit
+npm run build
+python backend/manage.py test
 ```
 
-Son 54 tests: permisos del panel, alta y edición de productos y combos, subida de imágenes, combos con productos despublicados, reserva de stock en el checkout, el total calculado con los precios del catálogo, la liberación de reservas vencidas, confirmación de email y recuperación de contraseña. Cloudinary y el correo están simulados. El frontend se revisa con `npm run lint` y `npx tsc --noEmit`.
+El último comando necesita las dependencias de Python instaladas y el entorno configurado. Los flujos de pago y envío requieren además pruebas de integración con sus servicios correspondientes.
 
-## Estado
+## Documentación
 
-Funciona en local con SQLite o PostgreSQL. No hay demo pública todavía: [`render.yaml`](render.yaml) está preparado para el plan gratuito de Render, pero no hay un despliegue activo.
+- [Endpoints de la API](docs/API.md)
+- [Variables de entorno y despliegue](docs/DESPLIEGUE.md)
+- [Configuración de infraestructura](render.yaml)
 
-El flujo de Mercado Pago no tiene tests automáticos y necesita credenciales reales para probarse. El stock es uno por producto, compartido entre sus sabores. No hay historial de pedidos para el cliente, seguimiento de envíos ni cupones, y el repositorio no tiene CI.
+## Imágenes del proyecto
 
-## Qué aprendí
+Las capturas de la interfaz anterior se retiraron de este README para evitar mostrar un diseño desactualizado. Se podrán incorporar nuevas capturas del diseño Ragnar Forge cuando estén verificadas.
 
-Aprendí que el checkout no termina cuando el cliente se va a pagar: hay reintentos, pagos que llegan tarde y reservas que vencen. Los combos me obligaron a pensar el stock como algo compartido entre productos y no como un número por artículo.
+## Uso del código
 
-## Licencia
-
-Sin licencia: todos los derechos reservados. El código es público para mostrar el proyecto, pero no se puede reutilizar. La marca, el logo y las fotos de productos son de Ragnar Suplementos.
+Repositorio público para mostrar la implementación y su arquitectura. No se incluye una licencia de reutilización; la marca, los logos y las imágenes de productos pertenecen a sus respectivos titulares.

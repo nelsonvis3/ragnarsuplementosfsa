@@ -77,7 +77,7 @@ function CheckoutNoticeContent() {
   );
 
   return (
-    <div className="mx-auto mt-5 flex max-w-6xl items-center justify-between gap-4 border border-ember/40 bg-ember/10 px-5 py-4 text-sm" role="status">
+    <div className="mx-auto mt-5 flex max-w-7xl items-center justify-between gap-4 rounded-xl border border-ember/40 bg-ember/10 px-5 py-4 text-sm" role="status">
       <div>
         <p>{mensaje}</p>
         {urlReintento && <a href={urlReintento} className="mt-2 inline-block text-ember underline">Volver a Mercado Pago</a>}

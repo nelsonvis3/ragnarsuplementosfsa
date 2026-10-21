@@ -62,34 +62,34 @@ export default function ProductPurchaseBox({
   }
 
   return (
-    <div className="grid gap-10 lg:grid-cols-2">
+    <div className="forge-product-detail grid gap-10 lg:grid-cols-2">
       {/* Galería de imagen */}
-      <div className="relative aspect-square border border-carbon-line bg-carbon-raised">
+      <div className="forge-product-visual relative aspect-square border border-carbon-line bg-carbon-raised">
         <Image
           src={imagenActual}
           alt={producto.nombre}
           fill
-          className="object-contain p-10"
+          className="object-contain p-12"
           sizes="(min-width: 1024px) 50vw, 100vw"
           priority
         />
       </div>
 
       {/* Info y compra */}
-      <div>
-        <span className="text-xs uppercase tracking-wide text-ember">
+      <div className="forge-product-info lg:py-7">
+        <span className="forge-eyebrow">
           {producto.categoria.replace("-", " ")}
         </span>
 
-        <h1 className="mt-2 font-display text-3xl font-semibold sm:text-4xl">
+        <h1 className="mt-5 font-display text-4xl font-bold sm:text-5xl">
           {producto.nombre}
         </h1>
 
-        <p className="mt-4 text-2xl font-semibold text-ember">
+        <p className="mt-6 font-display text-3xl font-bold text-ember">
           {formatearPrecio(producto.precio)}
         </p>
 
-        <p className="mt-4 text-bone-dim">{producto.descripcion}</p>
+        <p className="mt-6 max-w-xl text-base leading-8 text-bone-dim">{producto.descripcion}</p>
 
         {/* Selector de sabor */}
         {tieneSabores && (

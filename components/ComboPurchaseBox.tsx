@@ -53,8 +53,8 @@ export default function ComboPurchaseBox({ combo }: { combo: Combo }) {
   }
 
   return (
-    <div className="grid gap-10 lg:grid-cols-2">
-      <div className="relative aspect-square border border-carbon-line bg-carbon-raised">
+    <div className="forge-product-detail grid gap-10 lg:grid-cols-2">
+      <div className="forge-product-visual relative aspect-square border border-carbon-line bg-carbon-raised">
         <Image
           src={combo.imagen}
           alt={combo.nombre}
@@ -65,12 +65,12 @@ export default function ComboPurchaseBox({ combo }: { combo: Combo }) {
         />
       </div>
 
-      <div>
-        <span className="text-xs uppercase tracking-wide text-ember">
+      <div className="forge-product-info lg:py-7">
+        <span className="forge-eyebrow">
           Combo
         </span>
 
-        <h1 className="mt-2 font-display text-3xl font-semibold sm:text-4xl">
+        <h1 className="mt-5 font-display text-4xl font-bold sm:text-5xl">
           {combo.nombre}
         </h1>
 
@@ -92,7 +92,7 @@ export default function ComboPurchaseBox({ combo }: { combo: Combo }) {
           </p>
         )}
 
-        <p className="mt-4 text-bone-dim">{combo.descripcion}</p>
+        <p className="mt-6 text-base leading-8 text-bone-dim">{combo.descripcion}</p>
 
         {/* Productos incluidos */}
         <div className="mt-8">

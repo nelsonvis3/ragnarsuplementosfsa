@@ -1,19 +1,3 @@
-export default function Nosotros() {
-  return (
-    <section id="nosotros" className="scroll-mt-24 border-t border-carbon-line bg-carbon-raised">
-      <div className="mx-auto max-w-6xl px-5 py-20">
-        <span className="font-display text-sm font-medium uppercase tracking-[0.2em] text-ember">
-          Sobre Ragnar
-        </span>
-        <h2 className="mt-2 max-w-xl font-display text-3xl font-semibold sm:text-4xl">
-          Rendimiento real, sin vueltas.
-        </h2>
-        <p className="mt-6 max-w-2xl text-base text-bone-dim">
-          Somos una marca enfocada en rendimiento real. Seleccionamos cada
-          producto pensando en calidad, absorción y resultados, sin vueltas
-          ni promesas vacías.
-        </p>
-      </div>
-    </section>
-  );
-}
+import Link from "next/link";
+
+export default function Nosotros(){return <section id="nosotros" className="scroll-mt-32 border-t border-carbon-line"><div className="mx-auto grid max-w-7xl gap-10 px-5 py-20 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:py-28"><div><span className="forge-eyebrow">SOBRE RAGNAR</span><h2 className="forge-title mt-4 text-4xl uppercase sm:text-6xl">NO HAY ATAJOS.<br/><span className="text-ember">HAY CONSTANCIA.</span></h2></div><div className="flex flex-col justify-center"><p className="text-lg leading-9 text-bone-dim">Ragnar Suplementos nace para quienes entrenan con intención. Acercamos suplementos deportivos, combos y asesoramiento directo en Formosa. Sin promesas mágicas: productos, información clara y una experiencia de compra simple.</p><div className="mt-9 flex flex-wrap gap-3"><Link href="/productos" className="inline-flex items-center gap-2 rounded-lg border border-carbon-line px-6 py-3 text-xs font-bold uppercase tracking-widest hover:border-ember">Conocé el catálogo</Link><a href="https://wa.me/5493704696533" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-ember px-6 py-3 text-xs font-bold uppercase tracking-widest text-ember hover:bg-ember/10">Hablar con Ragnar</a></div></div></div></section>}
