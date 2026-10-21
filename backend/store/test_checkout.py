@@ -3,6 +3,8 @@ from decimal import Decimal
 from uuid import uuid4
 
 from django.core.cache import cache
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import AccessToken
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -16,6 +18,10 @@ class CheckoutTests(APITestCase):
 
     def setUp(self):
         cache.clear()
+        self.usuario = get_user_model().objects.create_user(
+            username="cliente@example.test", email="cliente@example.test", password="SyntheticCheckout2026!"
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {AccessToken.for_user(self.usuario)}")
 
     def comprar(self, cantidad, **extra_item):
         return self.client.post("/pagos/crear-preferencia", {
@@ -50,3 +56,25 @@ class CheckoutTests(APITestCase):
         self.assertEqual(self.producto.stock, 10)
         self.assertEqual(pedido.estado, "cancelado")
         self.assertFalse(pedido.stock_reservado)
+
+    def test_visitante_no_puede_confirmar_compra_aunque_envie_todos_los_datos(self):
+        self.client.credentials()
+        respuesta = self.comprar(1)
+        self.assertEqual(respuesta.status_code, 401)
+        self.assertFalse(Pedido.objects.exists())
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 10)
+
+    def test_email_distinto_al_de_la_cuenta_se_rechaza(self):
+        self.client.post("/pagos/crear-preferencia", {
+            "checkout_key": str(uuid4()),
+            "items": [{"tipo": "producto", "id": self.producto.pk, "cantidad": 1}],
+            "nombre_comprador": "Comprador",
+            "telefono_comprador": "123456789",
+            "email_comprador": "otra-persona@example.test",
+            "medio_pago": "local",
+            "forma_entrega": "retiro",
+        }, format="json")
+        respuesta = self.comprar(1)
+        self.assertEqual(respuesta.status_code, 201, respuesta.data)
+        self.assertEqual(Pedido.objects.get(pk=respuesta.data["pedido_id"]).usuario_id, self.usuario.pk)

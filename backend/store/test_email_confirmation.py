@@ -185,3 +185,10 @@ class ConfirmacionEmailTests(APITestCase):
         html = mail.outbox[0].alternatives[0].content
         self.assertNotIn('<img src=x onerror=', html)
         self.assertIn('&lt;img', html)
+
+    def test_registro_con_backend_de_consola_no_afirma_entrega_real(self):
+        with override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"):
+            response = self.registrar()
+        self.assertEqual(response.status_code, 201)
+        self.assertFalse(response.data["correo_enviado"])
+        self.assertIn("terminal", response.data["detail"].lower())

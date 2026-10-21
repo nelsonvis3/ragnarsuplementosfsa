@@ -43,10 +43,14 @@ services:
         value: "0"
       - key: MP_ENABLED
         value: "false"
-      # SOLO DEMO: correos escritos en los logs, sin entrega a destinatarios reales.
-      # Sustituir por proveedor de email HTTP antes de habilitar altas públicas reales.
+      # Resend envía emails por HTTPS (Render Free bloquea SMTP).
+      # Sin API key y un remitente autorizado, el alta queda pendiente y avisa del fallo.
       - key: EMAIL_BACKEND
-        value: django.core.mail.backends.console.EmailBackend
+        value: store.email_backend.ResendEmailBackend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
 
   - type: web
     name: ragnar-web
