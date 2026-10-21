@@ -1,10 +1,6 @@
-databases:
-  - name: ragnar-db
-    databaseName: ragnar
-    user: ragnar
-    plan: free
-    region: ohio
-
+# DEMO sin costo: 2 servicios Web Free en Render + Neon PostgreSQL Free.
+# IMPORTANTE: Render Free duerme tras inactividad y no debe usarse para una tienda con pedidos reales.
+# Crear previamente Neon y proporcionar su cadena de conexión en DATABASE_URL.
 services:
   - type: web
     name: ragnar-api
@@ -12,12 +8,13 @@ services:
     plan: free
     region: ohio
     buildCommand: pip install -r requirements.txt && python backend/manage.py collectstatic --noinput
-    preDeployCommand: python backend/manage.py migrate --noinput && python backend/manage.py ensure_catalogo
-    startCommand: gunicorn --chdir backend config.wsgi:application --bind 0.0.0.0:$PORT
+    # Free no soporta preDeployCommand ni shell remoto.
+    # Se aplican migraciones al arrancar y ensure_catalogo solo crea datos si la tabla está vacía.
+    startCommand: python backend/manage.py migrate --noinput && python backend/manage.py ensure_catalogo && gunicorn --chdir backend config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 90
     healthCheckPath: /health/
     envVars:
       - key: PYTHON_VERSION
-        value: 3.14.3
+        value: "3.14.3"
       - key: DJANGO_DEBUG
         value: "false"
       - key: DJANGO_SECRET_KEY
@@ -28,25 +25,28 @@ services:
           name: ragnar-api
           envVarKey: RENDER_EXTERNAL_HOSTNAME
       - key: DATABASE_URL
-        fromDatabase:
-          name: ragnar-db
-          property: connectionString
+        sync: false
       - key: FRONTEND_URL
-        value: https://ragnar-web.onrender.com
+        fromService:
+          type: web
+          name: ragnar-web
+          envVarKey: RENDER_EXTERNAL_URL
+      # La app Django exige configurar esta variable en producción.
+      # FRONTEND_URL agrega también el dominio exacto como origen CORS.
       - key: CORS_ALLOWED_ORIGIN_REGEXES
-        value: ^https://ragnar-web(?:-[a-z0-9-]+)?\.onrender\.com$
+        value: '^https://ragnar-web(?:-[a-z0-9-]+)?\.onrender\.com$'
       - key: PEDIDO_RESERVA_MINUTOS
         value: "1440"
       - key: DJANGO_SECURE_SSL_REDIRECT
         value: "true"
       - key: DJANGO_SECURE_HSTS_SECONDS
         value: "0"
-      - key: PAGO_ALIAS
-        sync: false
-      - key: PAGO_CVU
-        sync: false
-      - key: PAGO_TITULAR
-        sync: false
+      - key: MP_ENABLED
+        value: "false"
+      # SOLO DEMO: correos escritos en los logs, sin entrega a destinatarios reales.
+      # Sustituir por proveedor de email HTTP antes de habilitar altas públicas reales.
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.console.EmailBackend
 
   - type: web
     name: ragnar-web
@@ -54,11 +54,11 @@ services:
     plan: free
     region: ohio
     buildCommand: npm ci && node scripts/render-build.mjs
-    startCommand: npm start -- --hostname 0.0.0.0
+    startCommand: npm start -- --hostname 0.0.0.0 --port $PORT
     healthCheckPath: /
     envVars:
       - key: NODE_VERSION
-        value: 24.21.0
+        value: "24.21.0"
       - key: DJANGO_API_HOST
         fromService:
           type: web

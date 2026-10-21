@@ -23,13 +23,12 @@ La plantilla es [`.env.example`](../.env.example). No subas credenciales reales 
 
 El frontend usa `NEXT_PUBLIC_API_URL` en `.env.local` (plantilla: [`.env.local.example`](../.env.local.example)). Se fija al compilar, así que cambiarla exige otro build.
 
-## Render
+## Render gratuito + Neon
 
-[`render.yaml`](../render.yaml) declara tres recursos del plan gratuito: la API Django, el sitio Next.js y una base PostgreSQL. No hay cron: las reservas vencidas se liberan cuando alguien consulta el catálogo o confirma una compra.
+Para publicar el frontend y la API en un entorno de demostración **sin costo**, consultá [la guía específica](DESPLIEGUE-GRATIS.md). El archivo [`render.yaml`](../render.yaml) ahora define dos Web Services Free, mientras que PostgreSQL se obtiene de Neon Free para evitar que la base caduque a los 30 días.
 
-El build del frontend toma `DJANGO_API_HOST` y arma `NEXT_PUBLIC_API_URL` con [`scripts/render-build.mjs`](../scripts/render-build.mjs). El archivo declara un `preDeployCommand` para migrar y cargar el catálogo, pero Render solo lo ejecuta en planes pagos ([documentación de Render](https://render.com/docs/deploys#pre-deploy-command)): en el plan gratuito, las migraciones, `ensure_catalogo` y `createsuperuser` se corren desde otra máquina con `DATABASE_URL` apuntando a la base de Render.
+Las migraciones y la carga inicial del catálogo se ejecutan al iniciar el backend, ya que Render Free no permite `preDeployCommand` ni acceso Shell. Para producción se debe cambiar este esquema por uno con despliegues supervisados, correo electrónico real, respaldos y servicios que no se duerman.
 
-Después del primer despliegue hay que cargar el stock real desde el panel, porque `ensure_catalogo` crea los productos con stock en cero.
 
 ## Servidor propio
 
