@@ -10,6 +10,8 @@
   --color-bone-dim: #b8b2ae;
   --color-signal: #75c9a7;
   --forge-accent-wash: rgba(214, 40, 57, .12);
+  --forge-scrollbar-thumb: #63323a;
+  --forge-scrollbar-hover: #d62839;
 }
 .light {
   color-scheme: light;
@@ -22,6 +24,8 @@
   --color-bone-dim: #595d65;
   --color-signal: #15654e;
   --forge-accent-wash: rgba(171, 32, 48, .09);
+  --forge-scrollbar-thumb: #bb7780;
+  --forge-scrollbar-hover: #ab2030;
 }
 @theme inline {
   --color-carbon: var(--color-carbon);
@@ -36,6 +40,21 @@
   --font-sans: var(--font-ibm-plex-sans);
 }
 html {scroll-behavior:smooth;}
+/* Scrollbar discreto: delgado, oscuro y con acento Ragnar.
+   La variante .light se ajusta automáticamente con las variables del tema. */
+html, body, .forge-app :where(*){
+  scrollbar-width:thin;
+  scrollbar-color:var(--forge-scrollbar-thumb) var(--color-carbon);
+}
+::-webkit-scrollbar{width:7px;height:7px;}
+::-webkit-scrollbar-track{background:var(--color-carbon);}
+::-webkit-scrollbar-thumb{
+  border-radius:999px;
+  background:var(--forge-scrollbar-thumb);
+  border:1px solid var(--color-carbon);
+}
+::-webkit-scrollbar-thumb:hover{background:var(--forge-scrollbar-hover);}
+::-webkit-scrollbar-corner{background:var(--color-carbon);}
 body {min-width:320px;background:var(--color-carbon);color:var(--color-bone);font-family:var(--font-sans);font-feature-settings:"ss01";-webkit-font-smoothing:antialiased;}
 body::selection {background:var(--color-ember);color:#fff;}
 :where(button,a,input,textarea,select):focus-visible{outline:2px solid var(--color-ember-bright);outline-offset:3px;}
@@ -84,7 +103,7 @@ button:disabled{cursor:not-allowed;}
 .forge-product-info button:not(:disabled){transition:transform .2s,border-color .2s,background-color .2s;}
 .forge-product-info button:not(:disabled):active{transform:scale(.985);}
 .forge-cart-panel{border-radius:0;background:var(--color-carbon-raised);box-shadow:0 30px 110px rgba(0,0,0,.5);}
-.forge-cart-panel section{scrollbar-width:thin;scrollbar-color:var(--color-ember) transparent;}
+.forge-cart-panel section{scrollbar-width:thin;scrollbar-color:var(--forge-scrollbar-thumb) var(--color-carbon);}
 .forge-cart-panel :where(input:not([type="radio"]),select,textarea){min-height:44px;border-radius:9px;background:var(--color-carbon);}
 .forge-cart-panel :where(label:has(input[type=radio]:checked)){border-color:var(--color-ember);background:var(--forge-accent-wash);}
 .forge-cart-panel :where(button, a){border-radius:8px;}
