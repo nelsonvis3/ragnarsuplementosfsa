@@ -13,7 +13,7 @@ Las rutas están en [`backend/config/urls.py`](../backend/config/urls.py) y el c
 | `GET /combos/<slug>/` | Detalle de un combo |
 | `GET /pagos/metodos` | Medios de pago habilitados |
 | `POST /envios/cotizar` | Distancia y costo de envío para una dirección de Formosa |
-| `POST /pagos/crear-preferencia` | Crear el pedido; con Mercado Pago devuelve el link de pago |
+| `POST /pagos/crear-preferencia` | Crear un pedido; **exige JWT válido** y que `email_comprador` coincida con el email de la cuenta. Con Mercado Pago devuelve el link de pago |
 | `GET /pagos/verificar-retorno` | Consultar el pago al volver de Mercado Pago |
 | `POST /pagos/webhook` | Notificaciones firmadas de Mercado Pago |
 | `POST /atencion/solicitudes` | Arrepentimiento, reclamo o consulta |

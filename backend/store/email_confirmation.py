@@ -30,11 +30,11 @@ def crear_token_confirmacion(verificacion):
 def enviar_enlace_confirmacion(verificacion):
     clave = "confirmacion-email:" + hashlib.sha256(verificacion.email.casefold().encode()).hexdigest()
     if not cache.add(clave, True, timeout=60):
-        return True
+        return False
     enlace = f"{settings.EMAIL_CONFIRMATION_FRONTEND_URL}/confirmar-email#{urlencode({'token': crear_token_confirmacion(verificacion)})}"
     try:
         enviar_bienvenida_registro(verificacion.usuario, enlace)
-        return True
+        return settings.EMAIL_BACKEND != "django.core.mail.backends.console.EmailBackend"
     except Exception:
         cache.delete(clave)
         logger.warning("No se pudo enviar un correo de confirmación de registro.")

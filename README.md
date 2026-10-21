@@ -10,7 +10,7 @@ Ragnar combina una experiencia de compra responsive con un catálogo administrab
 - Catálogo de productos por categoría, variantes de sabor con imágenes y combos.
 - Tarjetas de producto, búsqueda y filtros; detalle de producto con selección de sabor y cantidad.
 - Carrito persistente con Zustand, vista rápida lateral y checkout en la página `/carrito`.
-- Compra como invitado o con cuenta: registro, confirmación de email y recuperación de contraseña.
+- Compra con cuenta registrada y email confirmado: registro, confirmación de email y recuperación de contraseña.
 - Retiro en el local o entrega dentro de Formosa, con cotización de envío según distancia.
 - Pago con Mercado Pago (si está configurado), transferencia o efectivo, según disponibilidad.
 - Formulario de asesoramiento y solicitudes de consulta, reclamo o arrepentimiento.

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Minus, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { useAuthStore } from "@/store/auth-store";
 import { ApiError, cotizarEnvio, crearPreferencia, listarCombos, listarMediosPago, listarProductos } from "@/lib/api";
@@ -23,6 +23,7 @@ export default function CarritoCheckout() {
   const eliminarCombo = useCartStore((state) => state.eliminarCombo);
   const usuario = useAuthStore((state) => state.usuario);
   const token = useAuthStore((state) => state.token);
+  const sesionVerificada = useAuthStore((state) => state.sesionVerificada);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [catalogoCombos, setCatalogoCombos] = useState<Combo[]>([]);
   const [catalogoListo, setCatalogoListo] = useState(false);
@@ -39,15 +40,13 @@ export default function CarritoCheckout() {
   const [nombre, setNombre] = useState("");
   const [nombreEditado, setNombreEditado] = useState(false);
   const [telefono, setTelefono] = useState("");
-  const [email, setEmail] = useState("");
-  const [emailEditado, setEmailEditado] = useState(false);
   const [checkoutCargando, setCheckoutCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const checkoutKey = useRef<string | null>(null);
   const checkoutFirma = useRef<string | null>(null);
   const catalogoCargando = !catalogoListo;
   const nombreCheckout = nombreEditado ? nombre : nombre || usuario?.nombre_completo || "";
-  const emailCheckout = emailEditado ? email : email || usuario?.email || "";
+  const emailCheckout = usuario?.email || "";
 
   useEffect(() => {
     let vigente = true;
@@ -172,6 +171,10 @@ export default function CarritoCheckout() {
   async function handleFinalizarCompra(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (!token || !usuario || !sesionVerificada) {
+      setError("Necesitás iniciar sesión con una cuenta confirmada para completar la compra.");
+      return;
+    }
     if (hayLineasSinCatalogo) {
       setError("Hay artículos que ya no están disponibles. Quitalos del carrito para continuar.");
       return;
@@ -368,7 +371,23 @@ export default function CarritoCheckout() {
             )}
           </section>
 
-          {!pedidoManual && !carritoVacio && (
+          {!pedidoManual && !carritoVacio && (!token || !usuario || !sesionVerificada ? (
+            <aside className="forge-cart-form flex flex-col justify-center gap-4 p-6 sm:p-8" aria-label="Identificación requerida para comprar">
+              <ShieldCheck size={31} className="text-ember" aria-hidden="true" />
+              <h3 className="font-display text-2xl font-bold uppercase tracking-tight">
+                {token ? "Verificá tu sesión" : "Tu cuenta, primero"}
+              </h3>
+              <p className="text-sm leading-7 text-bone-dim">
+                {token
+                  ? "Estamos comprobando tu sesión. Si no se confirma, volvé a iniciar sesión para continuar."
+                  : "Para completar tu compra necesitás registrarte, confirmar tu email e iniciar sesión. Tus productos quedan guardados en el carrito."}
+              </p>
+              <Link href="/login?next=/carrito" className="rounded-lg bg-ember px-5 py-3.5 text-center text-sm font-bold uppercase tracking-wider text-white hover:bg-ember-bright">
+                {token ? "Volver a iniciar sesión" : "Iniciar sesión"}
+              </Link>
+              {!token && <Link href="/login?modo=registro&next=/carrito" className="rounded-lg border border-carbon-line px-5 py-3.5 text-center text-sm font-semibold uppercase tracking-wide text-bone hover:border-ember">Crear una cuenta</Link>}
+            </aside>
+          ) : (
             <form onSubmit={handleFinalizarCompra} className="forge-cart-form shrink-0 p-3 sm:p-5 md:min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain">
               <fieldset className="mb-2 sm:mb-4">
                 <legend className="mb-1 text-sm font-medium sm:mb-2">¿Cómo querés recibirlo?</legend>
@@ -480,19 +499,18 @@ export default function CarritoCheckout() {
               />
               </div>
               <div>
-              <label htmlFor="checkout-email" className="mb-1 block text-xs sm:text-sm">Email</label>
+              <label htmlFor="checkout-email" className="mb-1 block text-xs sm:text-sm">Email verificado</label>
               <input
                 id="checkout-email"
                 type="email"
                 required
                     value={emailCheckout}
-                    onChange={(event) => {
-                      setEmail(event.target.value);
-                      setEmailEditado(true);
-                    }}
-                placeholder="tu@email.com"
+                    readOnly
+                    autoComplete="email"
+                    aria-describedby="checkout-email-info"
                 className="mb-2 w-full border border-carbon-line bg-carbon px-2 py-1.5 text-sm outline-none focus:border-ember sm:mb-4 sm:px-3 sm:py-2"
               />
+              <p id="checkout-email-info" className="mb-2 text-[11px] text-bone-dim">Usamos el email confirmado de tu cuenta para enviar el comprobante.</p>
               </div>
               </div>
               <fieldset className="mb-2 sm:mb-4">
@@ -548,7 +566,7 @@ export default function CarritoCheckout() {
                 </button>
               </div>
             </form>
-          )}
+          ))}
         </div>
     </section>
   );

@@ -120,10 +120,18 @@ def registro(request):
     except IntegrityError:
         return Response({"detail": "Ya existe una cuenta con ese email."}, status=400)
     enviado = enviar_enlace_confirmacion(verificacion)
+    solo_consola = settings.EMAIL_BACKEND == "django.core.mail.backends.console.EmailBackend"
+    detalle = (
+        "Cuenta creada. El enlace de confirmación está en la terminal de Django; no se envió a Gmail."
+        if solo_consola
+        else "¡Cuenta creada! Revisá tu correo y confirmá tu email antes de iniciar sesión."
+        if enviado
+        else "Cuenta creada, pero no se pudo enviar el correo. Revisá la configuración del servicio y solicitá un nuevo enlace."
+    )
     return Response({
         "email": email,
-        "correo_enviado": enviado,
-        "detail": "¡Tu cuenta está creada! Revisá tu correo y confirmá tu e-mail para iniciar sesión." if enviado else "Tu cuenta está creada, pero no pudimos enviar el correo. Solicitá un nuevo enlace para confirmar tu e-mail.",
+        "correo_enviado": enviado and not solo_consola,
+        "detail": detalle,
     }, status=201)
 
 
@@ -378,16 +386,18 @@ def respuesta_checkout_existente(pedido, hash_payload):
 
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def crear_preferencia(request):
     expirar_reservas_vencidas()
     serializer = CheckoutSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
+    if serializer.validated_data["email_comprador"].casefold() != request.user.email.casefold():
+        return Response({"email_comprador": "Para comprar, usá el email verificado de tu cuenta."}, status=400)
     medio_pago = serializer.validated_data["medio_pago"]
     checkout_key = serializer.validated_data["checkout_key"]
     datos_payload = dict(serializer.validated_data)
     datos_payload.pop("checkout_key", None)
-    datos_payload["usuario_id"] = request.user.pk if request.user.is_authenticated else None
+    datos_payload["usuario_id"] = request.user.pk
     hash_payload = hashlib.sha256(
         json.dumps(datos_payload, sort_keys=True, default=str, ensure_ascii=False).encode("utf-8")
     ).hexdigest()
@@ -429,7 +439,7 @@ def crear_preferencia(request):
     try:
         with transaction.atomic():
             pedido = Pedido.objects.create(
-                usuario=request.user if request.user.is_authenticated else None,
+                usuario=request.user,
                 nombre_comprador=serializer.validated_data["nombre_comprador"].strip(),
                 telefono_comprador=serializer.validated_data["telefono_comprador"].strip(),
                 email_comprador=serializer.validated_data["email_comprador"],

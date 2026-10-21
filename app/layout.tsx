@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, IBM_Plex_Sans } from "next/font/google";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import StoreChrome from "@/components/StoreChrome";
 import StoreHydration from "@/components/StoreHydration";
 import "./globals.css";
 
@@ -49,9 +48,7 @@ export default function RootLayout({
       </head>
       <body className="forge-app min-h-full flex flex-col bg-carbon text-bone">
         <StoreHydration />
-        <Navbar />
-        {children}
-        <Footer />
+        <StoreChrome>{children}</StoreChrome>
       </body>
     </html>
   );
