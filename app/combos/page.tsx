@@ -1,54 +1,10 @@
 "use client";
-
-import { useEffect, useState } from "react";
+import { useEffect,useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import ComboCard from "@/components/ComboCard";
 import { listarCombos } from "@/lib/api";
 import type { Combo } from "@/types/producto";
-
-export default function CombosPage() {
-  const [combos, setCombos] = useState<Combo[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vigente = true;
-    listarCombos()
-      .then((datos) => {
-        if (vigente) setCombos(datos);
-      })
-      .catch((err: unknown) => {
-        if (vigente) setError(err instanceof Error ? err.message : "No pudimos cargar los combos.");
-      })
-      .finally(() => {
-        if (vigente) setCargando(false);
-      });
-    return () => {
-      vigente = false;
-    };
-  }, []);
-
-  return (
-    <main className="flex-1">
-      <div className="mx-auto max-w-6xl px-5 py-14">
-        <span className="text-xs font-medium uppercase tracking-[0.3em] text-ember">
-          Ahorrá comprando en combo
-        </span>
-        <h1 className="mt-2 font-display text-4xl font-semibold sm:text-5xl">Nuestros combos</h1>
-        <p className="mt-4 max-w-xl text-bone-dim">
-          Combinaciones pensadas para tu entrenamiento, a un precio mejor que comprando cada producto por separado.
-        </p>
-
-        {cargando && <p className="mt-10 text-bone-dim">Cargando combos…</p>}
-        {error && <p className="mt-10 border border-ember/40 p-4 text-ember">{error}</p>}
-        {!cargando && !error && combos.length === 0 && (
-          <p className="mt-10 text-bone-dim">Todavía no hay combos publicados.</p>
-        )}
-        {!cargando && !error && combos.length > 0 && (
-          <div className="mt-10 grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-            {combos.map((combo) => <ComboCard key={combo.id} combo={combo} />)}
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
+export default function CombosPage(){const[combos,setCombos]=useState<Combo[]>([]);const[cargando,setCargando]=useState(true);const[error,setError]=useState("");
+useEffect(()=>{let live=true;listarCombos().then(cs=>{if(live)setCombos(cs);}).catch((e:unknown)=>{if(live)setError(e instanceof Error?e.message:"No se pudieron cargar los combos.");}).finally(()=>{if(live)setCargando(false);});return()=>{live=false;};},[]);
+return <main className="flex-1"><div className="border-b border-carbon-line bg-[radial-gradient(ellipse_at_80%_50%,rgba(214,40,57,.13),transparent_50%)]"><div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24"><span className="forge-eyebrow">RAGNAR / COMBOS</span><h1 className="forge-title mt-4 text-5xl uppercase sm:text-7xl">MÁS EN EQUIPO.<br/><span className="text-ember">MEJOR EN COMBO.</span></h1><p className="mt-5 max-w-xl text-sm leading-7 text-bone-dim sm:text-base">Combinaciones de suplementos con precio propio. Descubrí qué incluye cada combo antes de elegir.</p></div></div><div className="mx-auto max-w-7xl px-5 py-10 sm:px-8"><Link href="/productos" className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-bone-dim hover:text-ember"><ArrowLeft size={17}/> Volver al catálogo</Link>{cargando&&<p className="mt-10 text-sm text-bone-dim">Cargando combos...</p>}{error&&<p role="alert" className="mt-10 rounded-lg border border-ember/40 p-5 text-ember">{error}</p>}{!cargando&&!error&&(combos.length?<div className="mt-9 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">{combos.map(c=><ComboCard combo={c} key={c.id}/>)}</div>:<p className="mt-10 rounded-xl border border-carbon-line bg-carbon-raised p-10 text-center text-bone-dim">Aún no hay combos publicados.</p>)}</div></main>}

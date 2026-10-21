@@ -66,7 +66,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex flex-1 items-center justify-center px-5 py-16">
-      <div className="w-full max-w-sm border border-carbon-line bg-carbon-raised p-8">
+      <div className="w-full max-w-md rounded-2xl border border-carbon-line bg-carbon-raised p-7 shadow-2xl sm:p-10">
         <div className="flex justify-center">
           <Logo width={36} height={59} className="h-10 w-auto" />
         </div>

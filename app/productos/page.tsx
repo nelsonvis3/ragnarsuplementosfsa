@@ -1,98 +1,28 @@
 "use client";
-
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense,useEffect,useMemo,useState } from "react";
+import { useRouter,useSearchParams } from "next/navigation";
+import { Search,SlidersHorizontal } from "lucide-react";
 import ProductoCard from "@/components/ProductoCard";
 import ComboCard from "@/components/ComboCard";
-import { listarCombos, listarProductos } from "@/lib/api";
-import type { Combo, Producto } from "@/types/producto";
-
-function CatalogoContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const categoriaActiva = searchParams.get("categoria") || "todos";
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [combos, setCombos] = useState<Combo[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vigente = true;
-    Promise.all([listarProductos(), listarCombos()])
-      .then(([productosApi, combosApi]) => {
-        if (!vigente) return;
-        setProductos(productosApi);
-        setCombos(combosApi);
-      })
-      .catch((err: unknown) => {
-        if (vigente) setError(err instanceof Error ? err.message : "No pudimos cargar el catálogo.");
-      })
-      .finally(() => {
-        if (vigente) setCargando(false);
-      });
-    return () => {
-      vigente = false;
-    };
-  }, []);
-
-  const categorias = ["todos", ...Array.from(new Set(productos.map((p) => p.categoria))), "combos"];
-  const mostrandoCombos = categoriaActiva === "combos";
-  const productosFiltrados =
-    categoriaActiva === "todos" || mostrandoCombos
-      ? productos
-      : productos.filter((producto) => producto.categoria === categoriaActiva);
-
-  function seleccionarCategoria(categoria: string) {
-    if (categoria === "todos") router.push("/productos");
-    else router.push(`/productos?categoria=${encodeURIComponent(categoria)}`);
-  }
-
-  return (
-    <main className="flex-1">
-      <div className="mx-auto max-w-6xl px-5 py-14">
-        <h1 className="font-display text-4xl font-semibold sm:text-5xl">Nuestros productos</h1>
-
-        {!cargando && !error && (
-          <div className="mt-8 flex flex-wrap gap-3">
-            {categorias.map((categoria) => (
-              <button
-                key={categoria}
-                onClick={() => seleccionarCategoria(categoria)}
-                className={`border px-4 py-2 text-sm capitalize transition-colors ${
-                  categoriaActiva === categoria
-                    ? "border-ember bg-ember text-carbon"
-                    : "border-carbon-line text-bone-dim hover:border-ember hover:text-ember"
-                }`}
-              >
-                {categoria.replace("-", " ")}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {cargando && <p className="mt-10 text-bone-dim">Cargando catálogo…</p>}
-        {error && <p className="mt-10 border border-ember/40 p-4 text-ember">{error}</p>}
-
-        {!cargando && !error && (
-          <div className="mt-10 grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-            {mostrandoCombos
-              ? combos.map((combo) => <ComboCard key={combo.id} combo={combo} />)
-              : productosFiltrados.map((producto) => <ProductoCard key={producto.id} producto={producto} />)}
-          </div>
-        )}
-
-        {!cargando && !error && (mostrandoCombos ? combos.length === 0 : productosFiltrados.length === 0) && (
-          <p className="mt-10 text-center text-bone-dim">No hay productos en esta categoría todavía.</p>
-        )}
-      </div>
-    </main>
-  );
+import { listarCombos,listarProductos } from "@/lib/api";
+import type { Combo,Producto } from "@/types/producto";
+type Orden="relevancia"|"menor"|"mayor"|"nombre";
+function Contenido(){
+const router=useRouter();const params=useSearchParams();const activa=params.get("categoria")||"todos";
+const [productos,setProductos]=useState<Producto[]>([]);const [combos,setCombos]=useState<Combo[]>([]);
+const [busqueda,setBusqueda]=useState("");const [orden,setOrden]=useState<Orden>("relevancia");
+const [soloDisponibles,setSoloDisponibles]=useState(false);const [cargando,setCargando]=useState(true);const [error,setError]=useState("");
+useEffect(()=>{let vigente=true;Promise.all([listarProductos(),listarCombos()]).then(([p,c])=>{if(vigente){setProductos(p);setCombos(c);}}).catch((e:unknown)=>{if(vigente)setError(e instanceof Error?e.message:"No se pudo cargar el catálogo.");}).finally(()=>{if(vigente)setCargando(false);});return()=>{vigente=false;};},[]);
+const categorias=useMemo(()=>["todos",...new Set(productos.map(p=>p.categoria)),"combos"],[productos]);
+const filtrados=useMemo(()=>productos.filter(p=>(activa==="todos"||activa==="combos"||p.categoria===activa)&&p.nombre.toLocaleLowerCase("es-AR").includes(busqueda.toLocaleLowerCase("es-AR"))&&(!soloDisponibles||p.stock>0)).sort((a,b)=>orden==="menor"?a.precio-b.precio:orden==="mayor"?b.precio-a.precio:orden==="nombre"?a.nombre.localeCompare(b.nombre,"es-AR"):0),[activa,busqueda,soloDisponibles,orden,productos]);
+const filtradosCombos=useMemo(()=>combos.filter(c=>c.nombre.toLowerCase().includes(busqueda.toLowerCase())&&(!soloDisponibles||(c.stock??0)>0)).sort((a,b)=>orden==="menor"?a.precio-b.precio:orden==="mayor"?b.precio-a.precio:orden==="nombre"?a.nombre.localeCompare(b.nombre,"es-AR"):0),[combos,busqueda,orden,soloDisponibles]);
+const count=activa==="combos"?filtradosCombos.length:filtrados.length;
+return <main className="flex-1"><section className="border-b border-carbon-line bg-carbon-raised/40"><div className="mx-auto max-w-7xl px-5 py-14 sm:px-8 sm:py-20"><span className="forge-eyebrow">RAGNAR / TIENDA</span><h1 className="forge-title mt-4 text-5xl uppercase sm:text-7xl">EQUIPÁ TU<br/><span className="text-ember">PRÓXIMO OBJETIVO.</span></h1><p className="mt-5 max-w-xl text-sm leading-7 text-bone-dim sm:text-base">Buscá proteínas, creatinas, pre-entrenos y otros suplementos. Elegí categoría y compará opciones en un solo lugar.</p></div></section>
+<section className="mx-auto max-w-7xl px-5 py-12 sm:px-8"><div className="grid gap-4 lg:grid-cols-[1fr_auto_auto] lg:items-center"><label className="relative"><Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-bone-dim"/><span className="sr-only">Buscar productos</span><input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="Buscar por nombre de producto..." className="h-12 w-full rounded-xl border border-carbon-line bg-carbon-raised py-3 pl-12 pr-4 text-sm outline-none focus:border-ember"/></label><label className="flex items-center gap-2 text-sm text-bone-dim"><SlidersHorizontal size={17}/><span className="sr-only">Ordenar por</span><select value={orden} onChange={e=>setOrden(e.target.value as Orden)} className="h-12 min-w-[176px] rounded-xl border border-carbon-line bg-carbon-raised px-3 text-bone"><option value="relevancia">Relevancia</option><option value="menor">Menor precio</option><option value="mayor">Mayor precio</option><option value="nombre">Nombre A–Z</option></select></label><label className="inline-flex items-center gap-3 text-sm"><input type="checkbox" checked={soloDisponibles} onChange={e=>setSoloDisponibles(e.target.checked)} className="h-4 w-4 accent-ember"/> Solo disponibles</label></div>
+<div className="mt-7 flex flex-wrap gap-2">{categorias.map(c=><button type="button" key={c} onClick={()=>router.push(c==="todos"?"/productos":`/productos?categoria=${encodeURIComponent(c)}`)} aria-pressed={activa===c} className={`rounded-lg border px-4 py-2.5 text-xs font-bold uppercase tracking-wider ${activa===c?"border-ember bg-ember text-white":"border-carbon-line bg-carbon-raised text-bone-dim hover:border-ember hover:text-bone"}`}>{c.replaceAll("-"," ")}</button>)}</div>
+<div className="mt-10 flex items-center justify-between border-b border-carbon-line pb-4"><h2 className="font-display text-lg font-bold">{activa==="combos"?"COMBOS":"PRODUCTOS"}</h2><span className="text-xs text-bone-dim">{cargando?"Cargando...":`${count} resultados`}</span></div>
+{error&&<p role="alert" className="mt-6 rounded-lg border border-ember p-4 text-sm text-ember">{error}</p>}
+{cargando&&<div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4" aria-label="Cargando productos">{Array.from({length:4},(_,i)=><div key={i} className="h-80 animate-pulse rounded-xl border border-carbon-line bg-carbon-raised"/>)}</div>}
+{!cargando&&!error&&(count>0?<div className="mt-7 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">{activa==="combos"?filtradosCombos.map(c=><ComboCard key={c.id} combo={c}/>):filtrados.map(p=><ProductoCard key={p.id} producto={p}/>)}</div>:<div className="mt-7 rounded-xl border border-carbon-line bg-carbon-raised px-8 py-16 text-center"><p className="font-display text-lg font-bold">No encontramos resultados.</p><p className="mt-2 text-sm text-bone-dim">Probá con otro término o cambiá los filtros.</p><button onClick={()=>{setBusqueda("");setSoloDisponibles(false);router.push("/productos");}} className="mt-5 rounded-lg border border-ember px-5 py-3 text-xs font-bold uppercase text-ember">Limpiar filtros</button></div>)}</section></main>
 }
-
-export default function CatalogoPage() {
-  return (
-    <Suspense fallback={null}>
-      <CatalogoContent />
-    </Suspense>
-  );
-}
+export default function CatalogoPage(){return <Suspense fallback={<main className="min-h-[50vh]"/>}><Contenido/></Suspense>}

@@ -1,41 +1,28 @@
 @import "tailwindcss";
-
 :root {
-  /* Superficie */
-  --color-carbon: #0a0a0a;
-  --color-carbon-raised: #171717;
-  --color-carbon-line: rgba(255, 255, 255, 0.08);
-
-  /* Acento — ámbar */
-  --color-ember: #fbbf24;
-  --color-ember-bright: #fcd34d;
-
-  /* Texto */
-  --color-bone: #ffffff;
-  --color-bone-dim: #a3a3a3;
-
-  /* Estado */
-  --color-signal: #5c8a5c;
+  color-scheme: dark;
+  --color-carbon: #0b0d10;
+  --color-carbon-raised: #171a20;
+  --color-carbon-line: rgba(244, 241, 236, .12);
+  --color-ember: #d62839;
+  --color-ember-bright: #f04452;
+  --color-bone: #f4f1ec;
+  --color-bone-dim: #b8b2ae;
+  --color-signal: #75c9a7;
+  --forge-accent-wash: rgba(214, 40, 57, .12);
 }
-
 .light {
-  /* Superficie */
-  --color-carbon: #ffffff;
-  --color-carbon-raised: #f5f5f5;
-  --color-carbon-line: rgba(0, 0, 0, 0.1);
-
-  /* Acento — mismo ámbar, ligeramente más oscuro para contraste sobre blanco */
-  --color-ember: #d97706;
-  --color-ember-bright: #b45309;
-
-  /* Texto */
-  --color-bone: #0a0a0a;
-  --color-bone-dim: #525252;
-
-  /* Estado */
-  --color-signal: #3f6b3f;
+  color-scheme: light;
+  --color-carbon: #f4f1ec;
+  --color-carbon-raised: #ffffff;
+  --color-carbon-line: rgba(19, 24, 30, .14);
+  --color-ember: #ab2030;
+  --color-ember-bright: #871524;
+  --color-bone: #16191d;
+  --color-bone-dim: #595d65;
+  --color-signal: #15654e;
+  --forge-accent-wash: rgba(171, 32, 48, .09);
 }
-
 @theme inline {
   --color-carbon: var(--color-carbon);
   --color-carbon-raised: var(--color-carbon-raised);
@@ -45,44 +32,115 @@
   --color-bone: var(--color-bone);
   --color-bone-dim: var(--color-bone-dim);
   --color-signal: var(--color-signal);
-
-  --font-display: var(--font-space-grotesk);
-  --font-sans: var(--font-inter);
+  --font-display: var(--font-archivo);
+  --font-sans: var(--font-ibm-plex-sans);
 }
+html {scroll-behavior:smooth;}
+body {min-width:320px;background:var(--color-carbon);color:var(--color-bone);font-family:var(--font-sans);font-feature-settings:"ss01";-webkit-font-smoothing:antialiased;}
+body::selection {background:var(--color-ember);color:#fff;}
+:where(button,a,input,textarea,select):focus-visible{outline:2px solid var(--color-ember-bright);outline-offset:3px;}
+:where(button,a) {transition:color .18s ease,background-color .18s ease,border-color .18s ease,opacity .18s ease;}
+button:not(:disabled){cursor:pointer;}
+button:disabled{cursor:not-allowed;}
+::placeholder{color:color-mix(in srgb,var(--color-bone-dim),transparent 15%);}
+.forge-app{background:var(--color-carbon);min-height:100vh;}
+.forge-app main{isolation:isolate;}
+.forge-app :where(h1,h2,h3){text-wrap:balance;}
+.forge-app :where(input:not([type="checkbox"]):not([type="radio"]),select,textarea){border-radius:9px;min-height:42px;}
+.forge-app :where(input,select,textarea){accent-color:var(--color-ember);}
+.forge-app :where(input:not([type="checkbox"]):not([type="radio"]),textarea,select):focus{outline:2px solid color-mix(in srgb,var(--color-ember) 52%,transparent);outline-offset:1px;}
+.forge-app :where(button,.forge-btn){border-radius:9px;}
+.forge-app :where(.bg-ember){color:#fff;}
+.forge-app :where(.bg-ember):not(:disabled):hover{filter:brightness(1.08);}
+.forge-app :where(.bg-signal){color:#07160f;}
+.forge-header{border-bottom:1px solid var(--color-carbon-line);box-shadow:0 12px 44px rgba(0,0,0,.08);background:color-mix(in srgb,var(--color-carbon) 96%,transparent);backdrop-filter:blur(20px);}
+.forge-announce{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--color-carbon-line);background:linear-gradient(90deg,#28151b,#1a161a 42%,#291319);font-size:10px;letter-spacing:.19em;color:#e8d6d8;text-align:center;font-weight:650;}
+.forge-announce b{color:#ff6874;font-weight:800;}
+.forge-header-inner{min-height:76px;}
+.forge-header-nav a{font-size:12px;letter-spacing:.085em;text-transform:uppercase;font-weight:700;}
+.forge-mobile-panel{border-radius:20px 0 0 20px;box-shadow:-18px 0 60px rgba(0,0,0,.38);}
+.forge-hero{position:relative;overflow:hidden;border-bottom:1px solid var(--color-carbon-line);background:radial-gradient(ellipse at 81% 49%,rgba(180,21,48,.25),transparent 38%),radial-gradient(ellipse at 21% 100%,rgba(113,19,38,.12),transparent 47%),#0b0d10;color:#f4f1ec;}
+.forge-hero:before{content:"";position:absolute;inset:0;opacity:.14;background-image:repeating-linear-gradient(0deg,transparent 0px,transparent 3px,#fff 4px);background-size:100% 5px;pointer-events:none;mask-image:linear-gradient(90deg,transparent,#000);}
+.forge-hero-art{position:relative;isolation:isolate;min-height:420px;overflow:visible;}
+.forge-hero-orbit{position:absolute;inset:10% 5% 4%;border:1px solid rgba(248,241,236,.13);border-radius:50%;transform:rotate(-18deg);}
+.forge-hero-orbit:after{content:"";position:absolute;inset:12%;border:1px dashed rgba(214,40,57,.37);border-radius:50%;}
+.forge-hero-glow{position:absolute;inset:10% 3%;background:radial-gradient(circle,rgba(214,40,57,.32) 0%,transparent 63%);filter:blur(15px);}
+.forge-eyebrow{font-size:11px;font-weight:750;letter-spacing:.17em;text-transform:uppercase;color:var(--color-ember);}
+.forge-label{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--color-ember);}
+.forge-title{font-family:var(--font-display);font-weight:800;letter-spacing:-.048em;line-height:1.03;}
+.forge-section{padding-top:88px;padding-bottom:88px;}
+.forge-frame{position:relative;overflow:hidden;border:1px solid var(--color-carbon-line);border-radius:22px;background:var(--color-carbon-raised);}
+.forge-frame:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(145deg,rgba(255,255,255,.025),transparent 60%);}
+.forge-card{position:relative;display:flex;flex-direction:column;min-width:0;overflow:hidden;border:1px solid var(--color-carbon-line);border-radius:18px;background:var(--color-carbon-raised);transition:border-color .22s ease,transform .22s ease,box-shadow .22s ease;}
+.forge-card:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--color-ember) 57%,transparent);box-shadow:0 20px 44px rgba(0,0,0,.17);}
+.forge-card-media{background:radial-gradient(ellipse at center,rgba(255,255,255,.055),transparent 75%),color-mix(in srgb,var(--color-carbon) 87%,var(--color-carbon-raised));}
+.forge-card-media img{filter:drop-shadow(0 18px 18px rgba(0,0,0,.28));transition:transform .4s cubic-bezier(.2,.8,.2,1);}
+.forge-card:hover .forge-card-media img{transform:scale(1.075);}
+.forge-product-detail{align-items:start;gap:clamp(24px,4vw,64px);}
+.forge-product-visual{overflow:hidden;border-radius:22px;border:1px solid var(--color-carbon-line);background:radial-gradient(circle at 50% 40%,rgba(178,29,45,.11),transparent 60%),var(--color-carbon-raised);}
+.forge-product-visual img{filter:drop-shadow(0 18px 22px rgba(0,0,0,.22));}
+.forge-product-info{position:relative;}
+.forge-product-info h1{font-size:clamp(2rem,4vw,4rem);line-height:1.07;letter-spacing:-.055em;max-width:18ch;}
+.forge-product-info button:not(:disabled){transition:transform .2s,border-color .2s,background-color .2s;}
+.forge-product-info button:not(:disabled):active{transform:scale(.985);}
+.forge-cart-panel{border-radius:0;background:var(--color-carbon-raised);box-shadow:0 30px 110px rgba(0,0,0,.5);}
+.forge-cart-panel section{scrollbar-width:thin;scrollbar-color:var(--color-ember) transparent;}
+.forge-cart-panel :where(input:not([type="radio"]),select,textarea){min-height:44px;border-radius:9px;background:var(--color-carbon);}
+.forge-cart-panel :where(label:has(input[type=radio]:checked)){border-color:var(--color-ember);background:var(--forge-accent-wash);}
+.forge-cart-panel :where(button, a){border-radius:8px;}
+.forge-cart-panel .forge-cart-item{padding:12px 8px;border:1px solid var(--color-carbon-line);border-radius:14px;background:color-mix(in srgb,var(--color-carbon-raised) 70%,var(--color-carbon));}
+.forge-cart-panel .forge-cart-item > .relative{border-radius:10px;overflow:hidden;}
+.forge-cart-panel .forge-cart-form{background:color-mix(in srgb,var(--color-carbon-raised) 82%,var(--color-carbon));}
+.forge-cart-panel .forge-cart-header{background:var(--color-carbon);padding:18px 24px;}
+.forge-cart-panel .forge-cart-summary{background:var(--color-carbon-raised);box-shadow:0 -10px 30px rgba(0,0,0,.09);border-radius:12px 12px 0 0;}
+.forge-cart-panel :where([role="alert"]){border-radius:9px;}
+.forge-app :where(main > div > div.border,main form,main section.border){border-radius:14px;}
+.forge-app :where(.border-carbon-line){border-color:var(--color-carbon-line);}
+.forge-app :where(.text-ember){color:var(--color-ember);}
+.forge-app :where(.text-bone-dim){color:var(--color-bone-dim);}
+.forge-app :where(.bg-carbon-raised){background-color:var(--color-carbon-raised);}
+.forge-app :where(.bg-carbon){background-color:var(--color-carbon);}
+.forge-app :where(a:hover){text-decoration-color:var(--color-ember);}
+@media (min-width:640px){.forge-cart-panel{border-radius:20px;}}
+@media (max-width:640px){.forge-hero-art{min-height:300px;}.forge-section{padding-top:56px;padding-bottom:56px;}.forge-header-inner{min-height:66px;}.forge-cart-panel .forge-cart-header{padding:15px 18px;}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important;}.forge-card:hover{transform:none;}}
 
-body {
-  background: var(--color-carbon);
-  color: var(--color-bone);
-  font-family: var(--font-sans);
-  transition: background-color 0.2s ease, color 0.2s ease;
+
+/* Ragnar Forge v1.4 — editorial layout and product-first category composition */
+.forge-category-card{
+  display:flex;flex-direction:column;min-width:0;overflow:hidden;
+  border:1px solid var(--color-carbon-line);border-radius:15px;
+  background:var(--color-carbon-raised);
+  transition:border-color .22s ease,transform .22s ease,box-shadow .22s ease;
 }
-
-/* Selección de texto con el acento, un detalle que refuerza identidad */
-::selection {
-  background: var(--color-ember);
-  color: var(--color-carbon);
+.forge-category-card:hover{border-color:color-mix(in srgb,var(--color-ember) 65%,transparent);transform:translateY(-3px);box-shadow:0 20px 40px rgba(0,0,0,.16);}
+.forge-category-media{background:radial-gradient(ellipse at 50% 48%,rgba(190,39,59,.11),transparent 60%),color-mix(in srgb,var(--color-carbon) 81%,var(--color-carbon-raised));}
+.forge-category-photo{filter:drop-shadow(0 13px 17px rgba(0,0,0,.37));transition:transform .35s ease;}
+.forge-category-card:hover .forge-category-photo{transform:scale(1.055);}
+.forge-category-copy{min-height:98px;}
+.forge-combo-feature{background:radial-gradient(ellipse at 90% 38%,rgba(175,25,45,.3),transparent 53%),linear-gradient(110deg,#150e12 7%,#211019 76%,#30111c);}
+.forge-combo-product{transform:scale(1.18);filter:drop-shadow(0 26px 29px rgba(0,0,0,.6));}
+.forge-hero-signature{
+  display:flex;align-items:center;gap:16px;
+  border:1px solid rgba(244,241,236,.22);border-left:3px solid #d62839;
+  background:linear-gradient(120deg,rgba(14,14,17,.96),rgba(34,18,24,.93));
+  box-shadow:0 16px 50px rgba(0,0,0,.36);backdrop-filter:blur(16px);
+  padding:13px 22px 13px 16px;
 }
-
-/* Animación de rebote para el botón del slide de combos, se reproduce
-   cada vez que el carrusel llega a ese slide (ver Hero.tsx). */
-@keyframes bounce-in {
-  0% {
-    opacity: 0;
-    transform: translateY(0) scale(0.8);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(-12px) scale(1.05);
-  }
-  70% {
-    transform: translateY(4px) scale(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.forge-hero-signature .forge-signature-r{font-family:var(--font-display);font-weight:900;font-style:italic;font-size:65px;letter-spacing:-.08em;line-height:.85;color:#f4f1ec;}
+.forge-cart-side{width:min(100vw,430px);height:100dvh;background:var(--color-carbon-raised);box-shadow:-20px 0 80px rgba(0,0,0,.4);animation:forge-cart-slide-in .26s cubic-bezier(.16,1,.3,1) both;}
+@keyframes forge-cart-slide-in{from{transform:translateX(100%);}to{transform:translateX(0);}}
+.forge-cart-side button,.forge-cart-side a{border-radius:9px;}
+.forge-full-cart{border-radius:18px;min-height:280px;}
+.forge-full-cart .forge-cart-form{align-self:stretch;}
+.forge-full-cart .forge-cart-header{background:var(--color-carbon-raised);}
+.forge-full-cart .forge-cart-summary{position:relative;bottom:auto;margin-bottom:-10px;}
+@media (max-width:640px){
+  .forge-category-copy{min-height:92px;}
+  .forge-combo-product{transform:scale(1.1);}
+  .forge-cart-side{width:100vw;}
 }
-
-.animate-bounce-in {
-  animation: bounce-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+@media (prefers-reduced-motion:reduce){
+  .forge-category-card:hover,.forge-category-card:hover .forge-category-photo{transform:none;}
+  .forge-cart-side{animation:none;}
 }

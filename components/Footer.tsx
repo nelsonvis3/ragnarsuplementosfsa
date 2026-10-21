@@ -7,16 +7,16 @@ const INSTAGRAM_PATH =
 
 export default function Footer() {
   return (
-    <footer className="mt-auto border-t border-carbon-line">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:grid-cols-2 lg:grid-cols-4">
+    <footer className="mt-auto border-t border-carbon-line bg-carbon-raised">
+      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-20 sm:grid-cols-2 sm:px-8 lg:grid-cols-4">
         <div>
           <div className="flex items-center gap-3">
             <Logo width={32} height={52} className="h-8 w-auto" />
-            <span className="font-display text-lg font-semibold tracking-wide">
+            <span className="font-display text-xl font-bold tracking-tight">
               RAGNAR
             </span>
           </div>
-          <p className="mt-3 text-sm text-bone-dim">Fuerza que se nota.</p>
+          <p className="mt-3 text-sm text-bone-dim">La fuerza se construye. Rendimiento real, sin vueltas.</p>
         </div>
 
         <div id="contacto" className="scroll-mt-24">
@@ -80,7 +80,7 @@ export default function Footer() {
         </div>
       </div>
 
-      <p className="border-t border-carbon-line py-5 text-center text-xs text-bone-dim">
+      <p className="border-t border-carbon-line px-5 py-6 text-center text-xs leading-6 text-bone-dim">
         &copy; 2026 Ragnar Suplementos.
         Pagina hecha por: nelsonsivisstum3@gmail.com
       </p>

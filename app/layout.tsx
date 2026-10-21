@@ -1,25 +1,27 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Inter } from "next/font/google";
+import { Archivo, IBM_Plex_Sans } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import StoreHydration from "@/components/StoreHydration";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  display: "swap",
 });
 
-const inter = Inter({
-  variable: "--font-inter",
+const ibmPlexSans = IBM_Plex_Sans({
+  variable: "--font-ibm-plex-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "Ragnar Suplementos",
   description:
-    "Suplementación de calidad para llevar tu entrenamiento al siguiente nivel.",
+    "Proteínas, creatinas, pre-entrenos y combos en Formosa. Ragnar Suplementos: la fuerza se construye.",
 };
 
 export default function RootLayout({
@@ -28,7 +30,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${spaceGrotesk.variable} ${inter.variable} h-full antialiased`}
+      className={`${archivo.variable} ${ibmPlexSans.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
@@ -45,7 +47,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-carbon text-bone">
+      <body className="forge-app min-h-full flex flex-col bg-carbon text-bone">
         <StoreHydration />
         <Navbar />
         {children}

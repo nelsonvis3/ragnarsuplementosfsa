@@ -1,207 +1,57 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-
-interface Boton {
-  texto: string;
-  href: string;
-  externo?: boolean;
-}
-
-interface Slide {
-  imagen?: string;
-  imagenMobile?: string;
-  kicker?: string;
-  titulo?: React.ReactNode;
-  texto?: string;
-  botones: Boton[];
-  sinOverlay?: boolean;
-}
-
-const SLIDES: Slide[] = [
-  {
-    // Primer slide sin imagen, con el texto sobre el fondo oscuro.
-    kicker: "Suplementación deportiva",
-    titulo: (
-      <>
-        Elegí tu
-        <br />
-        <span className="text-ember">suplementación.</span>
-      </>
-    ),
-    texto:
-      "Proteínas, creatina y pre-entrenos. Consultá el rótulo de cada producto para ver su composición e indicaciones.",
-    botones: [
-      { texto: "Ver catálogo", href: "/productos" },
-      {
-        texto: "Hablanos por WhatsApp",
-        href: "https://wa.me/5493704696533",
-        externo: true,
-      },
-    ],
-  },
-  {
-    imagen: "/hero-slides/slide-4-combos.png",
-    imagenMobile: "/hero-slides/slide-4-combos-mobile.jpg",
-    botones: [{ texto: "Ver productos", href: "/combos" }],
-    sinOverlay: true,
-  },
-];
-
-const INTERVALO_MS = 5000;
+import { ShieldCheck, Zap } from "lucide-react";
 
 export default function Hero() {
-  const [slideActivo, setSlideActivo] = useState(0);
-  const [kickerVisible, setKickerVisible] = useState(false);
-
-  useEffect(() => {
-    const intervalo = setInterval(() => {
-      setSlideActivo((actual) => (actual + 1) % SLIDES.length);
-    }, INTERVALO_MS);
-
-    return () => clearInterval(intervalo);
-  }, []);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => setKickerVisible(true), 100);
-    return () => clearTimeout(timeout);
-  }, []);
-
   return (
-    <section className="relative min-h-[85vh] overflow-hidden border-b border-carbon-line bg-carbon">
-      {SLIDES.map((slide, index) => {
-        const activo = index === slideActivo;
-        const posicion = activo
-          ? "translate-x-0 opacity-100"
-          : index < slideActivo
-            ? "-translate-x-full opacity-0"
-            : "translate-x-full opacity-0";
-
-        return (
-          <div
-            key={index}
-            aria-hidden={!activo}
-            className={`absolute inset-0 overflow-hidden transition-[transform,opacity] duration-700 ease-in-out ${posicion} ${
-              activo ? "pointer-events-auto" : "pointer-events-none"
-            }`}
-          >
-            {slide.imagen && (
-              <>
-                {slide.imagenMobile ? (
-                  <>
-                    <Image
-                      src={slide.imagen}
-                      alt=""
-                      fill
-                      priority
-                      sizes="100vw"
-                      className="hidden object-cover md:block"
-                    />
-                    <div className="absolute inset-x-0 top-0 bottom-20 bg-carbon md:hidden">
-                      <Image
-                        src={slide.imagenMobile}
-                        alt="Promoción de combos Ragnar Suplementos"
-                        fill
-                        priority
-                        sizes="(max-width: 767px) 100vw, 1px"
-                        className="object-contain object-center"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <Image
-                    src={slide.imagen}
-                    alt=""
-                    fill
-                    priority
-                    sizes="100vw"
-                    className="object-cover"
-                  />
-                )}
-              </>
-            )}
-
-            {!slide.sinOverlay && (
-              <div className="absolute inset-0 bg-carbon/70" />
-            )}
-
-            {slide.titulo ? (
-              <div className="relative z-10 flex min-h-[85vh] flex-col items-center justify-center px-5 text-center">
-                {slide.kicker && (
-                  <span
-                    className={`text-xs font-medium uppercase tracking-[0.3em] text-ember transition-opacity duration-1000 ${
-                      kickerVisible ? "opacity-100" : "opacity-0"
-                    }`}
-                  >
-                    {slide.kicker}
-                  </span>
-                )}
-
-                <h1 className="mt-4 font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-                  {slide.titulo}
-                </h1>
-
-                {slide.texto && (
-                  <p className="mx-auto mt-6 max-w-md text-base text-bone-dim">
-                    {slide.texto}
-                  </p>
-                )}
-
-                <div className="mt-8 flex flex-wrap justify-center gap-4">
-                  {slide.botones.map((boton) =>
-                    boton.externo ? (
-                      <Link
-                        key={boton.texto}
-                        href={boton.href}
-                        target="_blank"
-                        rel="noopener"
-                        className="border border-bone px-7 py-3 text-sm font-semibold uppercase tracking-wide transition-colors hover:border-ember hover:text-ember"
-                      >
-                        {boton.texto}
-                      </Link>
-                    ) : (
-                      <Link
-                        key={boton.texto}
-                        href={boton.href}
-                        className="bg-ember px-7 py-3 text-sm font-semibold uppercase tracking-wide text-carbon transition-colors hover:bg-ember-bright"
-                      >
-                        {boton.texto}
-                      </Link>
-                    )
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="absolute inset-x-0 bottom-16 z-10 flex justify-center px-5">
-                {slide.botones.map((boton) => (
-                  <Link
-                    key={boton.texto}
-                    href={boton.href}
-                    className="animate-bounce-in bg-ember px-7 py-3 text-center text-sm font-semibold uppercase tracking-wide text-carbon transition-colors hover:bg-ember-bright"
-                  >
-                    {boton.texto}
-                  </Link>
-                ))}
-              </div>
-            )}
+    <section className="forge-hero" aria-labelledby="hero-title">
+      <div className="relative mx-auto grid min-h-[690px] max-w-7xl items-center gap-4 px-5 pb-10 pt-14 sm:px-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-0 lg:py-20">
+        <div className="relative z-20 max-w-2xl">
+          <span className="inline-flex items-center gap-2 border-l-2 border-ember pl-3 text-[11px] font-bold uppercase tracking-[.26em] text-[#e0a3a9]">
+            Suplementación deportiva · Formosa
+          </span>
+          <h1 id="hero-title" className="mt-7 font-display text-[clamp(3.35rem,6.7vw,7.3rem)] font-extrabold uppercase leading-[.95] tracking-[-.065em]">
+            LA FUERZA <span className="mt-1 block text-[.78em] tracking-[-.058em] text-[#e83b4b]">SE CONSTRUYE.</span>
+          </h1>
+          <p className="mt-8 max-w-lg text-base leading-7 text-[#c1b9ba] sm:text-lg">
+            Proteínas, creatinas, pre-entrenos y combos. Elegí lo que necesitás, entrená a tu ritmo y llevá tu disciplina más lejos.
+          </p>
+          <div className="mt-9 flex flex-wrap items-center gap-3">
+            <Link href="/productos" className="inline-flex min-h-14 items-center justify-center gap-3 rounded-lg bg-[#d62839] px-7 text-sm font-bold uppercase tracking-wider text-white hover:bg-[#f04452]">
+              Explorar catálogo
+            </Link>
+            <Link href="/combos" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-white/30 px-6 text-sm font-semibold uppercase tracking-wider text-white hover:border-[#f04452]">
+              Ver combos
+            </Link>
           </div>
-        );
-      })}
-
-      <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
-        {SLIDES.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => setSlideActivo(index)}
-            aria-label={`Ir al slide ${index + 1}`}
-            aria-current={index === slideActivo ? "true" : undefined}
-            className={`h-1.5 w-8 transition-colors ${
-              index === slideActivo ? "bg-ember" : "bg-bone/30"
-            }`}
-          />
-        ))}
+          <div className="mt-14 flex flex-wrap gap-8 border-t border-white/15 pt-5 text-xs uppercase tracking-[.13em] text-[#c5babd]">
+            <span className="inline-flex items-center gap-2"><ShieldCheck className="text-[#f04452]" size={18}/> Productos originales</span>
+            <span className="inline-flex items-center gap-2"><Zap className="text-[#f04452]" size={18}/> Entregas en Formosa</span>
+          </div>
+        </div>
+        <div className="forge-hero-art z-10 flex items-center justify-center lg:translate-x-6" aria-label="Suplementos deportivos">
+          <div className="forge-hero-glow" />
+          <div className="forge-hero-orbit" />
+          <span aria-hidden="true" className="pointer-events-none absolute left-0 top-[12%] z-0 font-display text-[clamp(7rem,18vw,20rem)] font-bold uppercase leading-none tracking-[-.09em] text-white/[.035]">R</span>
+          <div className="relative z-10 h-[300px] w-[65%] max-w-[450px] sm:h-[420px] lg:h-[520px]">
+            <Image src="/productos-img/proteinas/proteina-onefit/proteina-onefit-907gr.png" alt="Proteína disponible en Ragnar Suplementos" fill priority sizes="(max-width: 1024px) 70vw, 35vw" className="object-contain drop-shadow-[0_45px_35px_rgba(0,0,0,.75)]"/>
+          </div>
+          <div className="absolute bottom-0 right-0 z-20 h-[170px] w-[37%] sm:bottom-[2%] sm:h-[240px]">
+            <Image src="/productos-img/creatinas/creatina-star/creatinastar.png" alt="Creatina disponible en Ragnar Suplementos" fill sizes="(max-width: 1024px) 28vw, 16vw" className="object-contain drop-shadow-[0_25px_28px_rgba(0,0,0,.8)]"/>
+          </div>
+          <div className="forge-hero-signature absolute bottom-[10%] left-[1%] z-20 hidden sm:flex" aria-label="Ragnar Suplementos, Formosa">
+            <span aria-hidden="true" className="forge-signature-r">R</span>
+            <span aria-hidden="true" className="h-12 w-px bg-[#d62839]"/>
+            <span className="flex flex-col">
+              <span className="font-display text-[28px] font-extrabold uppercase leading-none tracking-[.045em] text-[#f4f1ec]">RAGNAR</span>
+              <span className="mt-1 text-[9px] font-bold uppercase tracking-[.25em] text-[#cdbfc0]">SUPLEMENTOS / FORMOSA</span>
+              <span className="mt-2 text-[10px] font-semibold uppercase tracking-[.055em] text-[#f08089]">El progreso se construye</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="relative z-10 border-t border-white/10 bg-black/25 py-3 text-center text-[10px] font-bold uppercase tracking-[.24em] text-[#c7babb]">
+        ENTRENAMIENTO / CONSTANCIA / PROGRESO
       </div>
     </section>
   );
