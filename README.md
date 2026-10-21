@@ -107,10 +107,6 @@ El último comando necesita las dependencias de Python instaladas y el entorno c
 - [Variables de entorno y despliegue](docs/DESPLIEGUE.md)
 - [Configuración de infraestructura](render.yaml)
 
-## Imágenes del proyecto
-
-Las capturas de la interfaz anterior se retiraron de este README para evitar mostrar un diseño desactualizado. Se podrán incorporar nuevas capturas del diseño Ragnar Forge cuando estén verificadas.
-
 ## Uso del código
 
 Repositorio público para mostrar la implementación y su arquitectura. No se incluye una licencia de reutilización; la marca, los logos y las imágenes de productos pertenecen a sus respectivos titulares.
