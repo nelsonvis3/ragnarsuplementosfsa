@@ -66,7 +66,7 @@ class CheckoutTests(APITestCase):
         self.assertEqual(self.producto.stock, 10)
 
     def test_email_distinto_al_de_la_cuenta_se_rechaza(self):
-        self.client.post("/pagos/crear-preferencia", {
+        rechazada = self.client.post("/pagos/crear-preferencia", {
             "checkout_key": str(uuid4()),
             "items": [{"tipo": "producto", "id": self.producto.pk, "cantidad": 1}],
             "nombre_comprador": "Comprador",
@@ -75,6 +75,8 @@ class CheckoutTests(APITestCase):
             "medio_pago": "local",
             "forma_entrega": "retiro",
         }, format="json")
+        self.assertEqual(rechazada.status_code, 400)
+        self.assertFalse(Pedido.objects.exists())
         respuesta = self.comprar(1)
         self.assertEqual(respuesta.status_code, 201, respuesta.data)
         self.assertEqual(Pedido.objects.get(pk=respuesta.data["pedido_id"]).usuario_id, self.usuario.pk)

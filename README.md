@@ -28,7 +28,7 @@ Ragnar combina una experiencia de compra responsive con un catálogo administrab
 | Estado | Zustand con persistencia local del carrito |
 | Backend | Python, Django 6, Django REST Framework, Simple JWT |
 | Datos | PostgreSQL en producción; SQLite para desarrollo |
-| Integraciones | Mercado Pago, Cloudinary, SMTP, OpenStreetMap (Nominatim y OSRM) |
+| Integraciones | Mercado Pago, Cloudinary, Resend (HTTPS) o SMTP, OpenStreetMap (Nominatim y OSRM) |
 
 ## Arquitectura y decisiones técnicas
 
