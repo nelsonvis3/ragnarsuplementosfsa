@@ -1,6 +1,9 @@
 from django.contrib import admin, messages
+from django import forms
+from django.db import transaction
 
-from .models import Combo, ItemPedido, Pedido, Producto, SolicitudAtencion, VerificacionEmail
+from .models import Categoria, Combo, ItemPedido, Pedido, Producto, SolicitudAtencion, VerificacionEmail
+from .catalog_admin import CategoriaAdminSerializer
 from .orders import completar_pedido_mercado_pago, procesar_pedido_manual, resolver_revision_pago
 from .views import procesar_notificacion_pago
 
@@ -8,6 +11,64 @@ from .views import procesar_notificacion_pago
 admin.site.site_header = "Administración de Ragnar Suplementos"
 admin.site.site_title = "Ragnar | Administración"
 admin.site.index_title = "Gestión de la tienda"
+
+
+class CategoriaForm(forms.ModelForm):
+    class Meta:
+        model = Categoria
+        fields = ("nombre",)
+
+    def clean_nombre(self):
+        from rest_framework.exceptions import ValidationError
+        try:
+            return CategoriaAdminSerializer().validate_nombre(self.cleaned_data["nombre"])
+        except ValidationError as exc:
+            raise forms.ValidationError(exc.detail)
+
+    def save(self, commit=True):
+        from django.utils.text import slugify
+        self.instance.slug = slugify(self.cleaned_data["nombre"])[:80]
+        return super().save(commit=commit)
+
+
+@admin.register(Categoria)
+class CategoriaAdmin(admin.ModelAdmin):
+    form = CategoriaForm
+    list_display = ("nombre", "slug")
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class HistorialProtegidoAdmin(admin.ModelAdmin):
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class ProductoInventarioForm(forms.ModelForm):
+    stock_anterior = forms.IntegerField(widget=forms.HiddenInput, required=False)
+
+    class Meta:
+        model = Producto
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and "stock_anterior" in self.fields:
+            self.fields["stock_anterior"].initial = self.instance.stock
+
+    def clean(self):
+        datos = super().clean()
+        if self.instance.pk and "stock" in datos:
+            # changeform_view mantiene una transacción durante validación y guardado.
+            with transaction.atomic():
+                actual = Producto.objects.select_for_update().get(pk=self.instance.pk)
+                if datos.get("stock_anterior") != actual.stock:
+                    raise forms.ValidationError("El stock cambió desde que abriste el formulario. Recargá la página y revisá las unidades antes de guardar.")
+        return datos
 
 
 @admin.register(VerificacionEmail)
@@ -25,9 +86,10 @@ class VerificacionEmailAdmin(admin.ModelAdmin):
 
 
 @admin.register(Producto)
-class ProductoAdmin(admin.ModelAdmin):
+class ProductoAdmin(HistorialProtegidoAdmin):
+    form = ProductoInventarioForm
     list_display = ("nombre", "categoria", "precio", "stock", "activo", "actualizado")
-    list_editable = ("precio", "stock", "activo")
+    list_editable = ("precio", "activo")
     list_filter = ("categoria", "activo")
     search_fields = ("nombre", "slug")
     prepopulated_fields = {"slug": ("nombre",)}
@@ -35,12 +97,25 @@ class ProductoAdmin(admin.ModelAdmin):
     readonly_fields = ("creado", "actualizado")
     fieldsets = (
         ("Información del producto", {"fields": ("nombre", "slug", "categoria", "descripcion")}),
-        ("Precio e inventario", {"fields": ("precio", "stock", "activo")}),
+        ("Precio e inventario", {"fields": ("precio", "stock", "stock_anterior", "activo")}),
         ("Imagen y sabores", {"fields": ("imagen_archivo", "imagen", "sabores")}),
         ("Fechas", {"fields": ("creado", "actualizado"), "classes": ("collapse",)}),
     )
 
+    def save_model(self, request, obj, form, change):
+        if not change:
+            return super().save_model(request, obj, form, change)
+        # El listado editable no debe reescribir stock leído antes de una compra.
+        campos = {field.name for field in obj._meta.concrete_fields}
+        modificados = [campo for campo in form.changed_data if campo in campos]
+        if modificados:
+            with transaction.atomic():
+                Producto.objects.select_for_update().get(pk=obj.pk)
+                obj.save(update_fields=[*modificados, "actualizado"])
+
     def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "categoria":
+            return forms.ChoiceField(choices=list(Categoria.objects.values_list("slug", "nombre")), label="Categoría")
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
         if db_field.name == "imagen" and formfield:
             formfield.help_text = (
@@ -51,7 +126,7 @@ class ProductoAdmin(admin.ModelAdmin):
 
 
 @admin.register(Combo)
-class ComboAdmin(admin.ModelAdmin):
+class ComboAdmin(HistorialProtegidoAdmin):
     list_display = ("nombre", "precio", "activo")
     list_editable = ("precio", "activo")
     list_filter = ("activo",)
@@ -90,11 +165,12 @@ class ItemPedidoInline(admin.TabularInline):
 
 
 @admin.register(Pedido)
-class PedidoAdmin(admin.ModelAdmin):
+class PedidoAdmin(HistorialProtegidoAdmin):
     list_display = ("id", "nombre_comprador", "telefono_comprador", "email_comprador", "total", "forma_entrega", "estado", "stock_reservado", "stock_reservado_hasta", "creado")
     list_filter = ("estado", "proveedor_pago", "creado")
     search_fields = ("nombre_comprador", "telefono_comprador", "email_comprador", "pago_id", "preferencia_id")
     readonly_fields = (
+        "usuario", "proveedor_pago", "checkout_key", "checkout_payload_hash", "preferencia_url",
         "estado", "stock_reservado", "stock_reservado_hasta", "nombre_comprador", "telefono_comprador", "email_comprador", "total", "costo_envio", "distancia_envio_km",
         "direccion_entrega", "forma_entrega", "preferencia_id", "pago_id", "pagos_adicionales", "creado", "actualizado",
     )
@@ -107,6 +183,9 @@ class PedidoAdmin(admin.ModelAdmin):
         "cerrar_revision_sin_pago",
         "cerrar_revision_reembolsado",
     )
+
+    def has_add_permission(self, request):
+        return False
 
     @admin.action(description="Marcar pago manual como recibido y completar pedido")
     def confirmar_pago_manual(self, request, queryset):

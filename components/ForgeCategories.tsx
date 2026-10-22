@@ -11,13 +11,13 @@ const categories = [
   {
     name: "CREATINAS",
     description: "Constancia y rendimiento",
-    href: "/productos?categoria=creatinas",
+    href: "/productos?categoria=creatina",
     image: "/productos-img/creatinas/creatina-star/creatinastar.png",
   },
   {
     name: "PRE-ENTRENOS",
     description: "Prepará cada sesión",
-    href: "/productos?categoria=pre-entrenos",
+    href: "/productos?categoria=pre-entreno",
     image: "/productos-img/pre-entrenos/pre-onefit300g-uva.png",
   },
   {

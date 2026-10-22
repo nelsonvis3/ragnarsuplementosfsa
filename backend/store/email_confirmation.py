@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
 from .emails import enviar_bienvenida_registro
+from .auth_payload import auth_payload
 from .models import VerificacionEmail
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,8 @@ def confirmar_email(request):
         verificacion.save(update_fields=["confirmado_en"])
         user.is_active = True
         user.save(update_fields=["is_active"])
-    return Response({"detail": "¡Email confirmado! Ya podés iniciar sesión y desbloquear tu potencial."})
+        sesion = auth_payload(user)
+    return Response({"detail": "¡Email confirmado! Tu sesión ya está iniciada. Bienvenido/a a Ragnar.", **sesion}, headers={"Cache-Control": "no-store"})
 
 
 @api_view(["POST"])

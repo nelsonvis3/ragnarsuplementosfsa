@@ -9,6 +9,13 @@ from .models import Pedido, Producto
 logger = logging.getLogger(__name__)
 
 
+def _notificar_pago_confirmado(pedido):
+    try:
+        enviar_confirmacion_pedido(pedido, pedido.proveedor_pago, pago_confirmado=True)
+    except Exception:
+        logger.warning("No se pudo enviar el correo de pago confirmado del pedido %s", pedido.pk)
+
+
 def expirar_reserva_pedido(pedido_id):
     """Cancela una reserva manual vencida y devuelve las unidades al inventario."""
     with transaction.atomic():
@@ -72,7 +79,7 @@ def procesar_pedido_manual(pedido_id, accion):
             return False, "El pedido ya no existe."
         if pedido.proveedor_pago not in ("transferencia", "local"):
             return False, "Este pedido no usa un medio de pago manual."
-        if pedido.estado != "pendiente":
+        if pedido.estado not in ("pendiente", "revisar_stock"):
             return False, f"El pedido ya está {pedido.get_estado_display().lower()}."
         if pedido.stock_reservado and pedido.stock_reservado_hasta and pedido.stock_reservado_hasta <= timezone.now():
             cantidades = _cantidades_del_pedido(pedido)
@@ -122,14 +129,7 @@ def procesar_pedido_manual(pedido_id, accion):
             pedido.save(update_fields=["estado", "stock_reservado", "stock_reservado_hasta", "actualizado"])
 
     if correo_pedido:
-        try:
-            enviar_confirmacion_pedido(
-                correo_pedido,
-                correo_pedido.proveedor_pago,
-                pago_confirmado=True,
-            )
-        except Exception:
-            logger.exception("No se pudo enviar el correo de pago confirmado del pedido %s", pedido_id)
+        transaction.on_commit(lambda: _notificar_pago_confirmado(correo_pedido))
     return True, "Pedido actualizado."
 
 
@@ -157,10 +157,7 @@ def completar_pedido_mercado_pago(pedido_id):
         pedido.save(update_fields=["estado", "actualizado"])
         correo_pedido = pedido
 
-    try:
-        enviar_confirmacion_pedido(correo_pedido, "mercado_pago", pago_confirmado=True)
-    except Exception:
-        logger.exception("No se pudo enviar el correo de pago confirmado del pedido %s", pedido_id)
+    transaction.on_commit(lambda: _notificar_pago_confirmado(correo_pedido))
     return True, "Pedido completado. El pago ya estaba aprobado; el inventario fue descontado."
 
 

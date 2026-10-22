@@ -20,7 +20,7 @@ function CheckoutNoticeContent() {
     let vigente = true;
 
     void verificarPagoRetorno(pedidoId, token, paymentId)
-      .then(async ({ estado, init_point: initPoint }) => {
+      .then(async ({ estado, init_point: initPoint, nombre_pedido: nombrePedido }) => {
         if (!vigente) return;
         if (estado === "aprobado" || estado === "revisar_stock") {
           await useCartStore.persist.rehydrate();
@@ -34,18 +34,18 @@ function CheckoutNoticeContent() {
           setUrlReintento("");
           setMensajeVerificacion(
             estado === "aprobado"
-              ? `¡Pago aprobado para el pedido #${pedidoId}! Gracias por comprar en Ragnar Suplementos.`
-              : `El pago del pedido #${pedidoId} fue aprobado y estamos revisando la disponibilidad. Nos contactaremos para coordinarlo.`
+              ? `¡Pago aprobado! ${nombrePedido}. Referencia ${pedidoId}. Gracias por comprar en Ragnar Suplementos.`
+              : `El pago de ${nombrePedido} fue aprobado y estamos revisando la disponibilidad. Referencia ${pedidoId}. Nos contactaremos para coordinarlo.`
           );
         } else if (estado === "reembolsado") {
           setUrlReintento("");
-          setMensajeVerificacion(`El pago del pedido #${pedidoId} fue reembolsado. Si necesitás ayuda, contactanos.`);
+          setMensajeVerificacion(`El pago de ${nombrePedido} fue reembolsado. Referencia ${pedidoId}. Si necesitás ayuda, contactanos.`);
         } else if (estado === "contracargo") {
           setUrlReintento("");
-          setMensajeVerificacion(`Mercado Pago informó un contracargo para el pedido #${pedidoId}. Contactanos para resolverlo.`);
+          setMensajeVerificacion(`Mercado Pago informó un contracargo para ${nombrePedido}. Referencia ${pedidoId}. Contactanos para resolverlo.`);
         } else if (estado === "revision_pago") {
           setUrlReintento("");
-          setMensajeVerificacion(`El pago del pedido #${pedidoId} requiere revisión. No vuelvas a pagar; contactanos para resolverlo.`);
+          setMensajeVerificacion(`El pago de ${nombrePedido} requiere revisión. Referencia ${pedidoId}. No vuelvas a pagar; contactanos para resolverlo.`);
         } else {
           setUrlReintento(initPoint);
           setMensajeVerificacion(

@@ -1,12 +1,14 @@
-Bienvenido/a a Ragnar.
+RAGNAR SUPLEMENTOS
+Desbloqueá tu potencial.
 
 Hola, {{ nombre }}.
-Hace click para desbloquear tu potencial!
+Te damos la bienvenida a Ragnar Suplementos. Tu próximo paso empieza acá.
+Hacé clic abajo para confirmar tu cuenta y desbloquear tu potencial.
 
-Confirmar e-mail:
+Confirmar mi cuenta:
 {{ enlace }}
 
-El enlace vence en 24 horas y se puede usar una sola vez. Después de confirmar tu email, podés iniciar sesión en Ragnar Suplementos.
+El enlace vence en 24 horas y se puede usar una sola vez. Al confirmar tu email, tu sesión en Ragnar Suplementos se inicia automáticamente.
 Si no creaste esta cuenta, ignorá este correo: la cuenta seguirá sin activar.
 
 RAGNAR — Fuerza que se nota.

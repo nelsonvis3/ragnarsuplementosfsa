@@ -3,7 +3,7 @@ import hmac
 import json
 import logging
 import os
-import hashlib
+from collections import Counter
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
@@ -14,6 +14,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
+from django.db.models import Sum
 from django.http import JsonResponse
 from django.core import signing
 from django.utils import timezone
@@ -21,17 +22,16 @@ from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from rest_framework import serializers
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle
-from rest_framework_simplejwt.tokens import RefreshToken
-
-from .emails import enviar_confirmacion_pedido, instrucciones_pago
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
+from .auth_payload import auth_payload, usuario_json
+from .emails import enviar_confirmacion_pedido, enviar_consulta_asesoramiento, instrucciones_pago
 from .email_confirmation import enviar_enlace_confirmacion
-from .models import Combo, ItemPedido, Pedido, Producto, SolicitudAtencion, VerificacionEmail
-from .permissions import puede_administrar_catalogo, puede_recuperar_contrasena
-from .orders import _cantidades_del_pedido, expirar_reservas_vencidas, resolver_revision_pago
+from .order_summary import datos_articulos_pedido, nombre_pedido
+from .models import Categoria, Combo, ItemPedido, Pedido, Producto, SolicitudAtencion, VerificacionEmail
+from .orders import _cantidades_del_pedido, _notificar_pago_confirmado, expirar_reservas_vencidas, resolver_revision_pago
 from .shipping import (
     ErrorCotizacionEnvio,
     calcular_distancia_ruta_km,
@@ -43,8 +43,11 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-class SolicitudAtencionThrottle(AnonRateThrottle):
+class SolicitudAtencionThrottle(SimpleRateThrottle):
     scope = "solicitud_atencion"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
 class RegistroThrottle(AnonRateThrottle):
@@ -59,18 +62,11 @@ class PagoRetornoThrottle(AnonRateThrottle):
     scope = "pago_retorno"
 
 
-def usuario_json(user):
-    return {
-        "id": user.id,
-        "nombre_completo": user.first_name or user.get_username(),
-        "email": user.email,
-        "puede_administrar_catalogo": puede_administrar_catalogo(user),
-        "puede_recuperar_contrasena": puede_recuperar_contrasena(user),
-    }
+class CotizarEnvioThrottle(SimpleRateThrottle):
+    scope = "cotizar_envio"
 
-
-def auth_payload(user):
-    return {"token": str(RefreshToken.for_user(user).access_token), "usuario": usuario_json(user)}
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
 @api_view(["GET"])
@@ -79,7 +75,8 @@ def health(request):
     from django.db import DatabaseError, connection
 
     try:
-        connection.ensure_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
     except DatabaseError:
         logger.exception("Health check: no se pudo conectar a la base de datos.")
         return Response({"status": "unavailable", "database": "unavailable"}, status=503)
@@ -89,7 +86,10 @@ def health(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([RegistroThrottle])
+@authentication_classes([])
 def registro(request):
+    if not isinstance(request.data, dict):
+        return Response({"detail": "Enviá un objeto con nombre, email y contraseña."}, status=400)
     nombre = str(request.data.get("nombre_completo", "")).strip()
     email = str(request.data.get("email", "")).strip().lower()
     password = str(request.data.get("password", ""))
@@ -138,9 +138,14 @@ def registro(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([LoginThrottle])
+@authentication_classes([])
 def login(request):
+    if not isinstance(request.data, dict):
+        return Response({"detail": "Enviá un objeto con email y contraseña."}, status=400)
     identificador = str(request.data.get("email", "")).strip()
     password = str(request.data.get("password", ""))
+    if len(identificador) > 254 or len(password) > 128:
+        return Response({"detail": "Email o contraseña incorrectos."}, status=400)
     user = authenticate(request, username=identificador, password=password)
     if user is None:
         usuarios = list(User.objects.filter(email__iexact=identificador)[:2])
@@ -208,6 +213,27 @@ def productos(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def categorias(request):
+    return Response(list(Categoria.objects.values("id", "nombre", "slug")))
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def productos_destacados(request):
+    expirar_reservas_vencidas()
+    ventas = ItemPedido.objects.filter(pedido__estado="aprobado").order_by()
+    unidades = Counter({fila["producto_id"]: fila["unidades"] for fila in
+                        ventas.filter(producto__isnull=False).values("producto_id").annotate(unidades=Sum("cantidad"))})
+    # La composición histórica permanece correcta aunque luego se edite el combo.
+    for fila in ventas.filter(producto__isnull=True).exclude(componentes_combo=[]).values("componentes_combo").annotate(unidades=Sum("cantidad")):
+        for producto_id in fila["componentes_combo"]:
+            unidades[producto_id] += fila["unidades"]
+    destacados = sorted(Producto.objects.filter(activo=True), key=lambda p: (-unidades[p.pk], p.pk))[:4]
+    return Response([producto_json(p) for p in destacados])
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def producto_detalle(request, slug):
     expirar_reservas_vencidas()
     try:
@@ -238,7 +264,7 @@ def combo_detalle(request, slug):
 
 class ItemCompraSerializer(serializers.Serializer):
     tipo = serializers.ChoiceField(choices=("producto", "combo"))
-    id = serializers.IntegerField(min_value=1)
+    id = serializers.IntegerField(min_value=1, max_value=9223372036854775807)
     cantidad = serializers.IntegerField(min_value=1, max_value=20)
     sabor = serializers.CharField(required=False, allow_blank=True, max_length=100)
 
@@ -288,6 +314,12 @@ def crear_solicitud_atencion(request):
     serializer = SolicitudAtencionSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     solicitud = SolicitudAtencion.objects.create(**serializer.validated_data)
+    if solicitud.tipo == "consulta":
+        try:
+            enviar_consulta_asesoramiento(solicitud)
+        except Exception:
+            # La consulta ya está guardada y puede atenderse desde Django Admin.
+            logger.warning("No se pudo notificar la consulta de asesoramiento #%s por correo.", solicitud.pk)
     return Response({"id": solicitud.pk, "detail": "Recibimos tu solicitud."}, status=201)
 
 
@@ -323,6 +355,7 @@ def metodos_pago(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([CotizarEnvioThrottle])
 def cotizar_envio(request):
     serializer = CotizarEnvioSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -373,6 +406,9 @@ def respuesta_checkout_existente(pedido, hash_payload):
     return Response({
         "tipo": "manual",
         "pedido_id": pedido.pk,
+        "nombre_pedido": nombre_pedido(pedido),
+        "nombre_comprador": pedido.nombre_comprador,
+        "items": datos_articulos_pedido(pedido),
         "stock_reservado_hasta": pedido.stock_reservado_hasta.isoformat() if pedido.stock_reservado_hasta else None,
         "medio_pago": pedido.proveedor_pago,
         "total": float(pedido.total),
@@ -452,10 +488,21 @@ def crear_preferencia(request):
                 checkout_key=checkout_key,
                 checkout_payload_hash=hash_payload,
             )
+            # Orden único de bloqueo: combos por ID, después productos por ID.
+            # Impide interbloqueos si dos carritos ordenan los mismos combos distinto.
+            combos_compra = {c.pk: c for c in Combo.objects.select_for_update().filter(
+                pk__in=[linea["id"] for linea in items_solicitados if linea["tipo"] == "combo"], activo=True
+            ).order_by("id").prefetch_related("productos")}
+            ids_productos = {linea["id"] for linea in items_solicitados if linea["tipo"] == "producto"}
+            for combo_compra in combos_compra.values():
+                ids_productos.update(p.pk for p in combo_compra.productos.all())
+            productos_compra = {p.pk: p for p in Producto.objects.select_for_update().filter(pk__in=ids_productos).order_by("id")}
             for linea in items_solicitados:
                 componentes_combo = []
                 if linea["tipo"] == "producto":
-                    obj = Producto.objects.get(pk=linea["id"], activo=True)
+                    obj = productos_compra.get(linea["id"])
+                    if obj is None or not obj.activo:
+                        raise Producto.DoesNotExist
                     nombre, precio = obj.nombre, obj.precio
                     producto, combo = obj, None
                     sabor = linea.get("sabor", "").strip()
@@ -469,10 +516,12 @@ def crear_preferencia(request):
                         raise serializers.ValidationError({"detail": f"El sabor elegido para {nombre} ya no está disponible."})
                     cantidades_stock[obj.id] = cantidades_stock.get(obj.id, 0) + linea["cantidad"]
                 else:
-                    obj = Combo.objects.select_for_update().prefetch_related("productos").get(pk=linea["id"], activo=True)
+                    obj = combos_compra.get(linea["id"])
+                    if obj is None:
+                        raise Combo.DoesNotExist
                     nombre, precio = obj.nombre, obj.precio
                     producto, combo = None, obj
-                    componentes = list(obj.productos.all())
+                    componentes = [productos_compra[p.pk] for p in obj.productos.all()]
                     if any(not componente.activo for componente in componentes):
                         raise serializers.ValidationError({"detail": f"El combo {nombre} tiene productos que ya no están disponibles."})
                     componentes_ids = [componente.pk for componente in componentes]
@@ -522,6 +571,8 @@ def crear_preferencia(request):
                     "currency_id": "ARS",
                 })
             pedido.total = total + costo_envio
+            if pedido.total > Decimal("9999999999.99"):
+                raise serializers.ValidationError({"detail": "El total del pedido supera el máximo admitido. Reducí las cantidades o contactanos."})
             pedido.stock_reservado = reservar_stock
             if reservar_stock:
                 pedido.stock_reservado_hasta = timezone.now() + timedelta(
@@ -548,6 +599,9 @@ def crear_preferencia(request):
         return Response({
             "tipo": "manual",
             "pedido_id": pedido.id,
+            "nombre_pedido": nombre_pedido(pedido),
+            "nombre_comprador": pedido.nombre_comprador,
+            "items": datos_articulos_pedido(pedido),
             "stock_reservado_hasta": pedido.stock_reservado_hasta.isoformat() if pedido.stock_reservado_hasta else None,
             "medio_pago": medio_pago,
             "total": float(pedido.total),
@@ -663,6 +717,8 @@ def procesar_notificacion_pago(pago_id, pedido_esperado=None):
         pedido_id = int(pago.get("external_reference"))
     except (TypeError, ValueError):
         return None, "pedido_invalido"
+    if not 0 < pedido_id <= 9223372036854775807:
+        return None, "pedido_invalido"
     if pedido_esperado is not None and pedido_id != pedido_esperado:
         return None, "pedido_mismatch"
 
@@ -755,7 +811,7 @@ def procesar_notificacion_pago(pago_id, pedido_esperado=None):
                 importe_pagado = Decimal(str(pago.get("transaction_amount")))
             except (InvalidOperation, TypeError, ValueError):
                 importe_pagado = None
-            if pago.get("currency_id") != "ARS" or importe_pagado != pedido.total:
+            if pago.get("currency_id") != "ARS" or importe_pagado is None or not importe_pagado.is_finite() or importe_pagado != pedido.total:
                 logger.error(
                     "El pago %s no coincide con el pedido %s: importe %s %s; esperado %s ARS",
                     pago_id,
@@ -791,10 +847,7 @@ def procesar_notificacion_pago(pago_id, pedido_esperado=None):
             correo_confirmacion = pedido
 
     if correo_confirmacion:
-        try:
-            enviar_confirmacion_pedido(correo_confirmacion, "mercado_pago", pago_confirmado=True)
-        except Exception:
-            logger.exception("No se pudo enviar el correo de pago confirmado del pedido %s", pedido_id)
+        transaction.on_commit(lambda: _notificar_pago_confirmado(correo_confirmacion))
     return pedido, pedido.estado
 
 
@@ -826,6 +879,7 @@ def verificar_pago_retorno(request):
     return Response({
         "pedido_id": pedido.pk,
         "estado": pedido.estado,
+        "nombre_pedido": nombre_pedido(pedido),
         "init_point": pedido.preferencia_url if pedido.estado == "pendiente" else "",
     })
 
@@ -837,8 +891,10 @@ def webhook_mercado_pago(request):
         return JsonResponse({"detail": "Firma inválida."}, status=401)
     try:
         body = json.loads(request.body or b"{}")
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"detail": "JSON inválido."}, status=400)
+    if not isinstance(body, dict) or not isinstance(body.get("data", {}), dict):
+        return JsonResponse({"detail": "El cuerpo y data deben ser objetos JSON."}, status=400)
     pago_id = request.GET.get("data.id") or body.get("data", {}).get("id")
     if not pago_id:
         return JsonResponse({"received": True})

@@ -20,6 +20,17 @@ class VerificacionEmail(models.Model):
         return f"{self.email} ({'confirmado' if self.confirmado_en else 'pendiente'})"
 
 
+class Categoria(models.Model):
+    nombre = models.CharField(max_length=80, unique=True)
+    slug = models.SlugField(max_length=80, unique=True)
+
+    class Meta:
+        ordering = ["nombre", "id"]
+
+    def __str__(self):
+        return self.nombre
+
+
 class Producto(models.Model):
     slug = models.SlugField(unique=True)
     nombre = models.CharField(max_length=180)

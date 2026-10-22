@@ -1,6 +1,7 @@
 import type { Combo, Producto } from "@/types/producto";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+const API_INTERNA = typeof window === "undefined" ? (process.env.API_INTERNAL_URL ?? API_URL) : API_URL;
 
 export interface Usuario {
   id: number;
@@ -37,6 +38,7 @@ export interface PreferenciaPago {
 
 export interface EstadoRetornoPago {
   pedido_id: number;
+  nombre_pedido: string;
   estado: "pendiente" | "aprobado" | "revisar_stock" | "revision_pago" | "reembolsado" | "contracargo" | "rechazado" | "cancelado";
   init_point: string;
 }
@@ -54,6 +56,9 @@ export interface MedioPago {
 export interface PedidoManual {
   tipo: "manual";
   pedido_id: number;
+  nombre_pedido: string;
+  nombre_comprador: string;
+  items: ArticuloPedido[];
   stock_reservado_hasta: string | null;
   medio_pago: "transferencia" | "local";
   total: number;
@@ -69,6 +74,59 @@ export interface PedidoManual {
     mensaje: string;
   };
   email_enviado: boolean;
+}
+
+export interface ArticuloPedido {
+  nombre: string;
+  sabor: string;
+  cantidad: number;
+  precio_unitario: number;
+}
+
+export type AccionPedido = "aprobar" | "cancelar" | "completar_stock" | "consultar_pago" | "cerrar_sin_pago" | "cerrar_reembolsado";
+
+export interface PedidoAdministracion {
+  id: number;
+  nombre_pedido: string;
+  items: ArticuloPedido[];
+  nombre_comprador: string;
+  email_comprador: string;
+  telefono_comprador: string;
+  estado: EstadoRetornoPago["estado"];
+  estado_nombre: string;
+  proveedor_pago: MedioPago["id"];
+  medio_pago_nombre: string;
+  forma_entrega: "retiro" | "envio";
+  entrega_nombre: string;
+  direccion_entrega: string;
+  total: number;
+  costo_envio: number;
+  stock_reservado: boolean;
+  stock_reservado_hasta: string | null;
+  pago_id: string | null;
+  pagos_adicionales: unknown[];
+  creado: string;
+  actualizado: string;
+  acciones: AccionPedido[];
+}
+
+export interface ListaPedidos {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: PedidoAdministracion[];
+}
+
+export function listarPedidosAdministracion(token: string, estado: string, buscar: string, pagina: number): Promise<ListaPedidos> {
+  const params = new URLSearchParams({ estado, buscar, page: String(pagina) });
+  return solicitar(`/administracion/pedidos/?${params}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+}
+
+export function gestionarPedidoAdministracion(token: string, pedido: PedidoAdministracion, accion: AccionPedido, verificadoProveedor: boolean): Promise<{ detail: string; pedido: PedidoAdministracion }> {
+  return solicitar(`/administracion/pedidos/${pedido.id}/gestionar/`, {
+    method: "POST", headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ accion, actualizado: pedido.actualizado, verificado_proveedor: verificadoProveedor }),
+  });
 }
 
 export interface CotizacionEnvio {
@@ -108,17 +166,21 @@ function mensajeError(valor: unknown): string {
 async function solicitar<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
   let respuesta: Response;
   const headers = new Headers(opciones.headers);
+  if (typeof window === "undefined" && process.env.API_INTERNAL_URL) {
+    headers.set("X-Forwarded-Proto", "https");
+  }
   if (opciones.body && !(opciones.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   try {
-    respuesta = await fetch(`${API_URL}${ruta}`, {
+    respuesta = await fetch(`${API_INTERNA}${ruta}`, {
       ...opciones,
+      signal: opciones.signal ?? AbortSignal.timeout(45000),
       cache: "no-store",
       headers,
     });
   } catch {
-    throw new ApiError("No pudimos conectar con Django. Comprobá que el backend esté activo.");
+    throw new ApiError("No pudimos conectar con la tienda. Intentá nuevamente en unos instantes.");
   }
 
   const data: unknown = await respuesta.json().catch(() => ({}));
@@ -130,6 +192,22 @@ async function solicitar<T>(ruta: string, opciones: RequestInit = {}): Promise<T
 
 export async function listarProductos(): Promise<Producto[]> {
   return solicitar<Producto[]>("/productos/");
+}
+
+export interface Categoria { id: number; nombre: string; slug: string }
+
+export async function listarCategorias(): Promise<Categoria[]> {
+  return solicitar<Categoria[]>("/categorias/");
+}
+
+export async function listarDestacados(): Promise<Producto[]> {
+  return solicitar<Producto[]>("/productos/destacados/");
+}
+
+export async function crearCategoria(token: string, nombre: string): Promise<Categoria> {
+  return solicitar<Categoria>("/administracion/categorias/", {
+    method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ nombre }),
+  });
 }
 
 export async function obtenerProductoPorSlug(slug: string): Promise<Producto | null> {
@@ -176,7 +254,7 @@ export async function registrarUsuario(
   });
 }
 
-export async function confirmarEmail(token: string): Promise<{ detail: string }> {
+export async function confirmarEmail(token: string): Promise<AuthResponse & { detail: string }> {
   return solicitar("/auth/email/confirmar", { method: "POST", body: JSON.stringify({ token }) });
 }
 
@@ -278,11 +356,12 @@ export interface ImagenSaborUpload { indice: number; archivo: File }
 
 export async function listarCatalogoAdministracion(token: string) {
   const headers = { Authorization: `Bearer ${token}` };
-  const [productos, combos] = await Promise.all([
+  const [productos, combos, categorias] = await Promise.all([
     solicitar<ProductoAdministracion[]>("/administracion/productos/", { headers }),
     solicitar<ComboAdministracion[]>("/administracion/combos/", { headers }),
+    solicitar<Categoria[]>("/administracion/categorias/", { headers }),
   ]);
-  return { productos, combos };
+  return { productos, combos, categorias };
 }
 
 export async function guardarArticuloAdministracion(
