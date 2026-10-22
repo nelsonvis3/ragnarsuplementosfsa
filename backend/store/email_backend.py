@@ -43,6 +43,8 @@ class ResendEmailBackend(BaseEmailBackend):
                     datos["cc"] = list(message.cc)
                 if message.bcc:
                     datos["bcc"] = list(message.bcc)
+                if message.reply_to:
+                    datos["reply_to"] = list(message.reply_to)
                 for alternativa in getattr(message, "alternatives", []):
                     if alternativa.mimetype == "text/html":
                         datos["html"] = alternativa.content

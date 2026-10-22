@@ -38,7 +38,10 @@ def tarifas_envio():
     try:
         for tramo in configuracion.split(","):
             limite, costo = tramo.split(":", 1)
-            tarifas.append((Decimal(limite.strip()), Decimal(costo.strip())))
+            limite, costo = Decimal(limite.strip()), Decimal(costo.strip())
+            if not limite.is_finite() or not costo.is_finite():
+                raise ValueError("Tarifa no finita")
+            tarifas.append((limite, costo))
         tarifas.sort(key=lambda tarifa: tarifa[0])
     except Exception as exc:
         raise ErrorCotizacionEnvio("La configuración de tarifas de envío no es válida.") from exc
@@ -95,6 +98,8 @@ def _geocodificar(direccion):
         if espera > 0:
             time.sleep(espera)
         parametros = urlencode({"q": direccion, "format": "jsonv2", "limit": 1, "countrycodes": "ar"})
+        if not cache.add("osm:geocode:rate", True, timeout=1):
+            raise ErrorCotizacionEnvio("El calculador está ocupado. Esperá unos segundos e intentá nuevamente.", status_code=503)
         _ULTIMA_GEOCODIFICACION = time.monotonic()
         resultados = _json_de_url(f"https://nominatim.openstreetmap.org/search?{parametros}")
 
@@ -102,6 +107,8 @@ def _geocodificar(direccion):
             raise ErrorCotizacionEnvio("No encontramos esa dirección. Agregá calle, altura y barrio de Formosa.")
         try:
             coordenadas = (float(resultados[0]["lon"]), float(resultados[0]["lat"]))
+            if not all(math.isfinite(c) for c in coordenadas) or not (-180 <= coordenadas[0] <= 180 and -90 <= coordenadas[1] <= 90):
+                raise ValueError("Coordenadas inválidas")
         except (KeyError, TypeError, ValueError, IndexError) as exc:
             raise ErrorCotizacionEnvio("El servicio de mapas no devolvió una ubicación válida.") from exc
         cache.set(cache_key, coordenadas, timeout=60 * 60 * 24 * 30)
@@ -124,12 +131,20 @@ def _distancia_ruta_metros(origen, destino):
             time.sleep(espera)
         coordenadas = f"{origen[0]},{origen[1]};{destino[0]},{destino[1]}"
         url = f"https://routing.openstreetmap.de/routed-car/route/v1/driving/{coordenadas}?overview=false&alternatives=false&steps=false"
+        if not cache.add("osm:route:rate", True, timeout=1):
+            raise ErrorCotizacionEnvio("El calculador está ocupado. Esperá unos segundos e intentá nuevamente.", status_code=503)
         _ULTIMA_RUTA = time.monotonic()
         resultado = _json_de_url(url)
-        rutas = resultado.get("routes", [])
-        if resultado.get("code") != "Ok" or not rutas or "distance" not in rutas[0]:
-            raise ErrorCotizacionEnvio("No encontramos una ruta en auto para esa dirección de Formosa.")
-        metros = int(rutas[0]["distance"])
+        try:
+            rutas = resultado.get("routes", [])
+            if resultado.get("code") != "Ok" or not rutas:
+                raise ValueError("Sin ruta")
+            distancia = float(rutas[0]["distance"])
+            if not math.isfinite(distancia) or distancia < 0:
+                raise ValueError("Distancia inválida")
+            metros = math.ceil(distancia)
+        except (AttributeError, KeyError, TypeError, ValueError, IndexError, OverflowError) as exc:
+            raise ErrorCotizacionEnvio("No encontramos una ruta en auto para esa dirección de Formosa.") from exc
         cache.set(cache_key, metros, timeout=60 * 60 * 24)
         return metros
 

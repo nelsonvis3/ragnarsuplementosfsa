@@ -7,12 +7,13 @@ import cloudinary.uploader
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
 from django.db import transaction
 from django.db.models.deletion import ProtectedError
+from django.utils.text import slugify
 from rest_framework import serializers, status, viewsets
 from rest_framework.exceptions import APIException, ParseError
 from rest_framework.parsers import DataAndFiles, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from .models import Combo, ItemPedido, Producto
+from .models import Categoria, Combo, ItemPedido, Producto
 from .permissions import AdministradorCatalogo
 
 logger = logging.getLogger(__name__)
@@ -143,6 +144,11 @@ class ProductoAdminSerializer(ImagenCatalogoSerializer):
             raise serializers.ValidationError("Agregá hasta 30 sabores con nombres diferentes.")
         return value
 
+    def validate_categoria(self, value):
+        if not Categoria.objects.filter(slug=value).exists():
+            raise serializers.ValidationError("Creá la categoría desde el panel antes de asignarla.")
+        return value
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         stock_anterior = attrs.pop("stock_anterior", None)
@@ -256,3 +262,32 @@ class ProductoAdminViewSet(CatalogoAdminViewSet):
 class ComboAdminViewSet(CatalogoAdminViewSet):
     queryset = Combo.objects.all().prefetch_related("productos").order_by("-actualizado")
     serializer_class = ComboAdminSerializer
+
+
+class CategoriaAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Categoria
+        fields = ("id", "nombre", "slug")
+        read_only_fields = ("id", "slug")
+
+    def validate_nombre(self, value):
+        slug = slugify(value)[:80]
+        if not slug or slug in {"todos", "combos"}:
+            raise serializers.ValidationError("Elegí un nombre de categoría distinto de Todos o Combos.")
+        if Categoria.objects.filter(slug=slug).exists() or Categoria.objects.filter(nombre__iexact=value).exists():
+            raise serializers.ValidationError("Ya existe una categoría con ese nombre.")
+        return value
+
+    def create(self, validated_data):
+        from django.db import IntegrityError
+        try:
+            with transaction.atomic():
+                return Categoria.objects.create(**validated_data, slug=slugify(validated_data["nombre"])[:80])
+        except IntegrityError:
+            raise serializers.ValidationError({"nombre": "Ya existe una categoría con ese nombre."})
+
+
+class CategoriaAdminViewSet(CatalogoAdminViewSet):
+    queryset = Categoria.objects.all()
+    serializer_class = CategoriaAdminSerializer
+    http_method_names = ("get", "post", "head", "options")

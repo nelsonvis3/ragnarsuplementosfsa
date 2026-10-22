@@ -44,6 +44,7 @@ export default function CarritoCheckout() {
   const [error, setError] = useState<string | null>(null);
   const checkoutKey = useRef<string | null>(null);
   const checkoutFirma = useRef<string | null>(null);
+  const cotizacionRevision = useRef(0);
   const catalogoCargando = !catalogoListo;
   const nombreCheckout = nombreEditado ? nombre : nombre || usuario?.nombre_completo || "";
   const emailCheckout = usuario?.email || "";
@@ -140,16 +141,21 @@ export default function CarritoCheckout() {
       return producto.stock - ((cantidadesPorProducto.get(id) ?? 0) - cantidadActual);
     })));
   }
-  const mensajeWhatsapp = pedidoManual
-    ? pedidoManual.medio_pago === "transferencia"
-      ? `Hola, realicé la transferencia del pedido #${pedidoManual.pedido_id} por ${formatearPrecio(pedidoManual.total)}. Adjunto el comprobante.`
-      : pedidoManual.forma_entrega === "envio"
-        ? `Hola, quiero coordinar la entrega a domicilio del pedido #${pedidoManual.pedido_id} por ${formatearPrecio(pedidoManual.total)}.`
-        : `Hola, quiero coordinar el pago y retiro del pedido #${pedidoManual.pedido_id} por ${formatearPrecio(pedidoManual.total)}.`
-    : "";
+  const mensajeWhatsapp = pedidoManual ? [
+    `Hola, soy ${pedidoManual.nombre_comprador}. ${pedidoManual.medio_pago === "transferencia"
+      ? "Quiero enviar el comprobante de mi compra."
+      : pedidoManual.forma_entrega === "envio" ? "Quiero coordinar la entrega de mi compra." : "Quiero coordinar el pago y retiro de mi compra."}`,
+    "",
+    ...pedidoManual.items.map((item) => `• ${item.cantidad} × ${item.nombre}${item.sabor ? ` (${item.sabor})` : ""}`),
+    "",
+    `Total: ${formatearPrecio(pedidoManual.total)}`,
+    pedidoManual.forma_entrega === "envio" ? `Entrega: ${pedidoManual.direccion_entrega}` : "Retiro en el local",
+    `Referencia: ${pedidoManual.pedido_id}`,
+  ].join("\n") : "";
   const whatsappPedidoUrl = `https://wa.me/5493704696533?text=${encodeURIComponent(mensajeWhatsapp)}`;
 
   async function handleCotizarEnvio() {
+    const revision = ++cotizacionRevision.current;
     setErrorEnvio(null);
     if (!direccionEntrega.trim()) {
       setErrorEnvio("Escribí la calle, altura y barrio para calcular el envío.");
@@ -159,8 +165,10 @@ export default function CarritoCheckout() {
     setError(null);
     try {
       const resultado = await cotizarEnvio(direccionEntrega.trim());
+      if (revision !== cotizacionRevision.current) return;
       setCotizacion(resultado);
     } catch (err) {
+      if (revision !== cotizacionRevision.current) return;
       setCotizacion(null);
       setErrorEnvio(err instanceof Error ? err.message : "No pudimos calcular el envío.");
     } finally {
@@ -295,7 +303,8 @@ export default function CarritoCheckout() {
             {pedidoManual && (
               <div className="border border-signal/40 bg-signal/10 p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-signal">Pedido recibido</p>
-                <h3 className="mt-2 font-display text-xl font-semibold">Pedido #{pedidoManual.pedido_id}</h3>
+                <h3 className="mt-2 font-display text-xl font-semibold">{pedidoManual.nombre_pedido}</h3>
+                <p className="mt-1 text-xs text-bone-dim">Referencia {pedidoManual.pedido_id}</p>
                 <p className="mt-2 text-sm">Productos: {formatearPrecio(pedidoManual.total - pedidoManual.costo_envio)}</p>
                 <p className="mt-1 text-sm">Envío: {formatearPrecio(pedidoManual.costo_envio)}</p>
                 <p className="mt-1 text-sm font-semibold">Total: {formatearPrecio(pedidoManual.total)}</p>
@@ -434,6 +443,7 @@ export default function CarritoCheckout() {
                     value={direccionEntrega}
                     onChange={(event) => {
                       setDireccionEntrega(event.target.value);
+                      cotizacionRevision.current += 1;
                       setCotizacion(null);
                       setErrorEnvio(null);
                     }}

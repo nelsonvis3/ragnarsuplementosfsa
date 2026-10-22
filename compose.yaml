@@ -1,0 +1,121 @@
+name: ragnar
+
+x-backend: &backend
+  image: ragnar-backend:${APP_VERSION:-local}
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile.backend
+  env_file: .env.production
+  environment:
+    DATABASE_URL: postgresql://ragnar:${POSTGRES_PASSWORD:?Configurá POSTGRES_PASSWORD}@db:5432/ragnar
+    REDIS_URL: redis://cache:6379/0
+    DJANGO_DEBUG: "false"
+    DJANGO_ALLOWED_HOSTS: ${DOMAIN:?Configurá DOMAIN},api,localhost
+    FRONTEND_URL: https://${DOMAIN}
+    DJANGO_CSRF_TRUSTED_ORIGINS: https://${DOMAIN}
+    EMAIL_CONFIRMATION_FRONTEND_URL: https://${DOMAIN}
+    PASSWORD_RESET_FRONTEND_URL: https://${DOMAIN}
+  init: true
+  restart: unless-stopped
+  logging: &logging
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ragnar
+      POSTGRES_USER: ragnar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ragnar -d ragnar"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    logging: *logging
+
+  cache:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    <<: *backend
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    restart: "no"
+    depends_on:
+      db: { condition: service_healthy }
+      cache: { condition: service_healthy }
+
+  api:
+    <<: *backend
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://localhost:8000/health/', headers={'X-Forwarded-Proto': 'https'}), timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  reservations:
+    <<: *backend
+    command: ["python", "/app/deploy/worker.py"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    image: ragnar-frontend:${APP_VERSION:-local}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.frontend
+      args: { NEXT_PUBLIC_API_URL: /api }
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    init: true
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    logging: *logging
+
+  nginx:
+    image: nginx:stable-alpine
+    environment:
+      DOMAIN: ${DOMAIN}
+      NGINX_ENVSUBST_FILTER: ^DOMAIN$$
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/nginx/${NGINX_TEMPLATE:-https.conf.template}:/etc/nginx/templates/default.conf.template:ro
+      - certificates:/etc/letsencrypt:ro
+      - acme:/var/www/certbot:ro
+    depends_on:
+      web: { condition: service_healthy }
+    restart: unless-stopped
+    logging: *logging
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["tools"]
+    volumes:
+      - certificates:/etc/letsencrypt
+      - acme:/var/www/certbot
+
+volumes:
+  postgres_data:
+  certificates:
+  acme:

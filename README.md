@@ -8,6 +8,7 @@ Ragnar combina una experiencia de compra responsive con un catálogo administrab
 
 **Tienda**
 - Catálogo de productos por categoría, variantes de sabor con imágenes y combos.
+- Destacados automáticos por unidades vendidas en pedidos aprobados, incluyendo componentes históricos de combos.
 - Tarjetas de producto, búsqueda y filtros; detalle de producto con selección de sabor y cantidad.
 - Carrito persistente con Zustand, vista rápida lateral y checkout en la página `/carrito`.
 - Compra con cuenta registrada y email confirmado: registro, confirmación de email y recuperación de contraseña.
@@ -16,8 +17,8 @@ Ragnar combina una experiencia de compra responsive con un catálogo administrab
 - Formulario de asesoramiento y solicitudes de consulta, reclamo o arrepentimiento.
 
 **Administración**
-- Panel en `/administracion` para publicar y editar productos, combos, precios, stock y fotografías.
-- Gestión de pedidos y pagos manuales desde Django Admin.
+- Panel en `/administracion` para publicar y editar productos, combos, precios, stock y fotografías; creación de categorías con nombres únicos.
+- Gestión de pedidos en `/administracion`: búsqueda por producto, cliente o referencia, filtros por estado, detalle de compra, confirmación de pagos manuales y cancelación con devolución del stock reservado. Django Admin conserva las mismas operaciones.
 - Validación del inventario y del importe del pedido en el servidor.
 
 ## Tecnologías
@@ -103,7 +104,10 @@ El último comando necesita las dependencias de Python instaladas y el entorno c
 
 ## Documentación
 
+- [Auditoría, correcciones y validaciones del 21/10/2026](docs/AUDITORIA-2026-10-21.md)
+
 - [Endpoints de la API](docs/API.md)
+- [VPS + Docker + Nginx y Gmail](docs/VPS-DOCKER.md)
 - [Variables de entorno y despliegue](docs/DESPLIEGUE.md)
 - [Deploy gratuito de prueba: Render + Neon](docs/DESPLIEGUE-GRATIS.md)
 - [Configuración de infraestructura](render.yaml)

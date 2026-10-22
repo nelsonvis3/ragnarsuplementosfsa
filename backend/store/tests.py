@@ -13,13 +13,15 @@ from PIL import Image
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
 
-from .models import Combo, ItemPedido, Pedido, Producto
+from .models import Categoria, Combo, ItemPedido, Pedido, Producto
 from .email_confirmation import crear_token_confirmacion
 
 
 class AdministracionCatalogoTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
+        for slug in ("creatinas", "proteinas", "vitaminas"):
+            Categoria.objects.get_or_create(slug=slug, defaults={"nombre": slug})
         User = get_user_model()
         cls.admin = User.objects.create_superuser(username="JefeRagnar", email="jefe@example.test", password="SyntheticTestPassword2026!")
         cls.cliente = User.objects.create_user(username="cliente@example.test", email="cliente@example.test", password="SyntheticTestPassword2026!")

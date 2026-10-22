@@ -57,7 +57,7 @@ export default function ProductPurchaseBox({
 
   function cambiarCantidad(delta: number) {
     setCantidad((actual) =>
-      Math.max(1, Math.min(Math.max(1, stockDisponibleParaSabor - cantidadSaborEnCarrito), actual + delta))
+      Math.max(1, Math.min(20 - cantidadSaborEnCarrito, Math.max(1, stockDisponibleParaSabor - cantidadSaborEnCarrito), actual + delta))
     );
   }
 
@@ -99,6 +99,7 @@ export default function ProductPurchaseBox({
               {producto.sabores.map((sabor) => (
                 <button
                   key={sabor.nombre}
+                  aria-pressed={saborActivo?.nombre === sabor.nombre}
                   onClick={() => setSaborActivo(sabor)}
                   className={`border px-4 py-2 text-sm transition-colors ${
                     saborActivo?.nombre === sabor.nombre
@@ -146,7 +147,7 @@ export default function ProductPurchaseBox({
         {/* Botón de agregar con feedback visual */}
         <button
           onClick={handleAgregar}
-          disabled={sinStock || cantidadSaborEnCarrito + cantidad > stockDisponibleParaSabor}
+          disabled={sinStock || cantidadSaborEnCarrito + cantidad > Math.min(20, stockDisponibleParaSabor)}
           className={`mt-8 flex w-full items-center justify-center gap-2 px-7 py-4 text-sm font-semibold uppercase tracking-wide transition-colors ${
             sinStock
               ? "cursor-not-allowed bg-carbon-line text-bone-dim"

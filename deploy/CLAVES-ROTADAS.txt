@@ -1,0 +1,23 @@
+CLAVES-ROTADAS.txt — bitácora personal de rotaciones
+=====================================================
+
+14/10: roté todo antes de tocar el despliegue.
+
+PANEL ADMIN (el retro, el que usaba siempre):
+    usuario: Nelsonvis3
+    clave:   Gaucho!Previa21
+    url:     http://127.0.0.1:8001/admin
+    (para entrar desde la red interna: http://192.168.100.10:8001/admin)
+
+BASE DE DATOS (la del despliegue viejo de septiembre):
+    usuario: ragnar_user
+    clave:   ragnar2024
+    base:    ragnar_db (127.0.0.1:5432)
+
+GMAIL SMTP (cuenta personal, clave de app vieja):
+    app password: oxpxdnszuyfafqold
+
+Cloudinary vieja: kqcehWFb46O0rp4jfsUXo-OLD  (cuenta kmorales-store)
+
+recordatorio para mí: el 15/10 rote también la del panel nuevo
+(Nelsonvis3) — esa quedó anotada en el cuaderno físico, NO guardarla acá.

@@ -3,13 +3,16 @@ from django.urls import include, path
 from rest_framework.routers import SimpleRouter
 
 from store import views
-from store.catalog_admin import ComboAdminViewSet, ProductoAdminViewSet
+from store.catalog_admin import CategoriaAdminViewSet, ComboAdminViewSet, ProductoAdminViewSet
+from store.order_admin import PedidoAdminViewSet
 from store.password_reset import recuperar_contrasena, restablecer_contrasena
 from store.email_confirmation import confirmar_email, reenviar_confirmacion
 
 catalogo_router = SimpleRouter()
 catalogo_router.register("productos", ProductoAdminViewSet, basename="administracion-productos")
 catalogo_router.register("combos", ComboAdminViewSet, basename="administracion-combos")
+catalogo_router.register("categorias", CategoriaAdminViewSet, basename="administracion-categorias")
+catalogo_router.register("pedidos", PedidoAdminViewSet, basename="administracion-pedidos")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -23,6 +26,8 @@ urlpatterns = [
     path("auth/contrasena/recuperar", recuperar_contrasena),
     path("auth/contrasena/restablecer", restablecer_contrasena),
     path("productos/", views.productos),
+    path("categorias/", views.categorias),
+    path("productos/destacados/", views.productos_destacados),
     path("productos/<slug:slug>/", views.producto_detalle),
     path("combos/", views.combos),
     path("combos/<slug:slug>/", views.combo_detalle),

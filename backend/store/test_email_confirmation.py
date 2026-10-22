@@ -1,4 +1,6 @@
 import re
+import io
+from contextlib import redirect_stdout
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
@@ -42,17 +44,18 @@ class ConfirmacionEmailTests(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         message = mail.outbox[0]
         self.assertEqual(message.to, [user.email])
-        self.assertIn("Bienvenido/a a Ragnar.", message.body)
-        self.assertIn("Hace click para desbloquear tu potencial!", message.body)
+        self.assertIn("Ragnar Suplementos", message.body)
+        self.assertIn("Hacé clic abajo para confirmar tu cuenta y desbloquear tu potencial.", message.body)
         html = message.alternatives[0].content
-        self.assertIn("Confirmar e-mail", html)
-        self.assertIn("#fbbf24", html)
-        self.assertIn("#0a0a0a", html)
+        self.assertIn("Confirmar mi cuenta", html)
+        self.assertIn("#d62839", html)
+        self.assertIn("#0b0d10", html)
+        self.assertNotIn("#fbbf24", html)
         self.assertIn('src="cid:ragnar-logo"', html)
         self.assertEqual(message.attachments[0]["Content-ID"], "<ragnar-logo>")
         self.assertEqual(message.attachments[0].get_content_type(), "image/png")
         self.assertEqual(message.attachments[0]["Content-Disposition"].content_disposition, "inline")
-        self.assertIn("Confirmar e-mail", message.message().get_body(preferencelist=("html",)).get_content())
+        self.assertIn("Confirmar mi cuenta", message.message().get_body(preferencelist=("html",)).get_content())
 
     def test_login_y_jwt_no_habilitan_una_cuenta_pendiente(self):
         user = self.cuenta_pendiente()
@@ -80,12 +83,20 @@ class ConfirmacionEmailTests(APITestCase):
         user = self.cuenta_pendiente()
         token = crear_token_confirmacion(user.verificacion_email)
         self.client.credentials(HTTP_AUTHORIZATION="Bearer vencido")
-        self.assertEqual(self.confirmar(token).status_code, 200)
+        confirmacion = self.confirmar(token)
+        self.assertEqual(confirmacion.status_code, 200)
+        self.assertEqual(confirmacion["Cache-Control"], "no-store")
+        self.assertEqual(confirmacion.data["usuario"]["id"], user.pk)
+        self.assertFalse(confirmacion.data["usuario"]["puede_administrar_catalogo"])
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {confirmacion.data["token"]}')
+        self.assertEqual(self.client.get("/auth/perfil").data["id"], user.pk)
         user.refresh_from_db()
         self.assertTrue(user.is_active)
         self.assertIsNotNone(user.verificacion_email.confirmado_en)
         self.assertFalse(user.is_staff or user.is_superuser)
-        self.assertEqual(self.confirmar(token).status_code, 400)
+        repetida = self.confirmar(token)
+        self.assertEqual(repetida.status_code, 400)
+        self.assertNotIn("token", repetida.data)
         self.client.credentials()
         login = self.client.post("/auth/login", {"email": user.email, "password": self.password}, format="json")
         self.assertEqual(login.status_code, 200, login.data)
@@ -187,7 +198,7 @@ class ConfirmacionEmailTests(APITestCase):
         self.assertIn('&lt;img', html)
 
     def test_registro_con_backend_de_consola_no_afirma_entrega_real(self):
-        with override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"):
+        with override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"), redirect_stdout(io.StringIO()):
             response = self.registrar()
         self.assertEqual(response.status_code, 201)
         self.assertFalse(response.data["correo_enviado"])

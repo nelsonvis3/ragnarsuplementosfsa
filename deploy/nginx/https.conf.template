@@ -1,0 +1,57 @@
+resolver 127.0.0.11 valid=10s ipv6=off;
+limit_req_zone $binary_remote_addr zone=auth:10m rate=10r/m;
+log_format ragnar '$remote_addr $request_method $uri $status $body_bytes_sent';
+access_log /var/log/nginx/access.log ragnar;
+server_tokens off;
+
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://${DOMAIN}$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 160m;
+    client_body_timeout 30s;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options DENY always;
+
+    set $backend http://api:8000;
+    set $frontend http://web:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_read_timeout 120s;
+    proxy_connect_timeout 10s;
+    proxy_http_version 1.1;
+
+    location = /api { return 308 /api/; }
+    location ^~ /api/auth/ {
+        limit_req zone=auth burst=10 nodelay;
+        limit_req_status 429;
+        client_max_body_size 16k;
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass $backend;
+    }
+    location /api/ {
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass $backend;
+    }
+    location /admin/ { proxy_pass $backend; }
+    location = /admin { return 308 /admin/; }
+    location /static/ { proxy_pass $backend; }
+    location / {
+        client_max_body_size 1m;
+        proxy_buffering off;
+        proxy_pass $frontend;
+    }
+}

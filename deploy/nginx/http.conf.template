@@ -1,0 +1,7 @@
+# Solo para obtener el primer certificado. La tienda se habilita con HTTPS.
+server {
+    listen 80;
+    server_name ${DOMAIN};
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 503; }
+}

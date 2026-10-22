@@ -108,8 +108,10 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 if not DEBUG:
     if any(not origin.startswith("https://") for origin in CORS_ALLOWED_ORIGINS):
         raise RuntimeError("En producción, FRONTEND_URL debe contener únicamente orígenes HTTPS públicos.")
-    if not CORS_ALLOWED_ORIGIN_REGEXES:
-        raise RuntimeError("Configurá CORS_ALLOWED_ORIGIN_REGEXES con el dominio público del frontend.")
+
+# Los límites de solicitudes y reenvíos deben compartirse entre workers.
+if os.getenv("REDIS_URL"):
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": os.environ["REDIS_URL"]}}
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
@@ -124,6 +126,7 @@ REST_FRAMEWORK = {
         "restablecer_contrasena": "20/hour",
         "reenviar_confirmacion": "5/hour",
         "confirmar_email": "20/hour",
+        "cotizar_envio": "20/hour",
     },
 }
 
@@ -135,7 +138,7 @@ if not DEBUG and os.getenv("MP_ENABLED", "false").strip().lower() == "true":
     if (
         mp_webhook_url.scheme != "https"
         or not mp_webhook_url.hostname
-        or mp_webhook_url.path.rstrip("/") != "/pagos/webhook"
+        or mp_webhook_url.path.rstrip("/") not in {"/pagos/webhook", "/api/pagos/webhook"}
         or not os.getenv("MP_WEBHOOK_SECRET", "").strip()
     ):
         raise RuntimeError("Mercado Pago requiere MP_WEBHOOK_URL y MP_WEBHOOK_SECRET en producción.")
@@ -191,7 +194,18 @@ EMAIL_BACKEND = os.getenv("EMAIL_BACKEND") or (
 EMAIL_HOST = os.getenv("EMAIL_HOST", "")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_TIMEOUT = 15
+EMAIL_FILE_PATH = os.getenv("EMAIL_FILE_PATH", str(BASE_DIR / "emails-locales"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Ragnar Suplementos <noreply@localhost>")
+ATENCION_EMAIL = os.getenv("ATENCION_EMAIL", "").strip()
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise RuntimeError("Elegí EMAIL_USE_TLS o EMAIL_USE_SSL, no ambos.")
+if not DEBUG and EMAIL_BACKEND == "django.core.mail.backends.smtp.EmailBackend":
+    if not all((EMAIL_HOST, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)):
+        raise RuntimeError("Configurá EMAIL_HOST, EMAIL_HOST_USER y EMAIL_HOST_PASSWORD para enviar los correos de registro.")
+    from email.utils import parseaddr
+    if "@" not in parseaddr(DEFAULT_FROM_EMAIL)[1] or parseaddr(DEFAULT_FROM_EMAIL)[1].endswith("@localhost"):
+        raise RuntimeError("Configurá DEFAULT_FROM_EMAIL con el remitente real.")

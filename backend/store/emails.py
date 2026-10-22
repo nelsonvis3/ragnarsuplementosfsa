@@ -5,12 +5,32 @@ from html import escape
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from .order_summary import nombre_pedido
+
+
+def enviar_consulta_asesoramiento(solicitud):
+    if not settings.ATENCION_EMAIL:
+        raise RuntimeError("Configurá ATENCION_EMAIL para recibir consultas.")
+    mensaje = EmailMultiAlternatives(
+        subject=f"Nueva consulta #{solicitud.pk} — Ragnar Suplementos",
+        body=(f"Nueva consulta de asesoramiento #{solicitud.pk}\n\n"
+              f"Nombre: {solicitud.nombre}\nEmail: {solicitud.email}\n"
+              f"Teléfono: {solicitud.telefono or 'No indicado'}\n"
+              f"Pedido: {solicitud.numero_pedido or 'No indicado'}\n\n"
+              f"{solicitud.mensaje}\n\nRespondé este correo para contactar al cliente.\n"
+              "La consulta también está guardada en Solicitudes de atención de Django Admin."),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[settings.ATENCION_EMAIL],
+        reply_to=[solicitud.email],
+    )
+    if mensaje.send(fail_silently=False) != 1:
+        raise RuntimeError("El proveedor no aceptó la notificación de la consulta.")
 
 
 def enviar_bienvenida_registro(user, enlace):
     contexto = {"nombre": user.first_name, "enlace": enlace}
     mensaje = EmailMultiAlternatives(
-        subject="Bienvenido/a a Ragnar. Confirmá tu e-mail",
+        subject="Ragnar Suplementos — Desbloqueá tu potencial",
         body=render_to_string("store/emails/bienvenida.txt", contexto),
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[user.email],
@@ -22,7 +42,8 @@ def enviar_bienvenida_registro(user, enlace):
         maintype="image", subtype="png", disposition="inline", cid="<ragnar-logo>", filename="ragnar-logo.png",
     )
     mensaje.attach(logo)
-    mensaje.send(fail_silently=False)
+    if mensaje.send(fail_silently=False) != 1:
+        raise RuntimeError("El proveedor no aceptó el correo de confirmación.")
 
 
 def enviar_recuperacion_contrasena(user, enlace):
@@ -93,6 +114,7 @@ def instrucciones_pago(medio, pago_confirmado=False, forma_entrega="retiro"):
 
 def enviar_confirmacion_pedido(pedido, medio, pago_confirmado=False):
     instrucciones = instrucciones_pago(medio, pago_confirmado, pedido.forma_entrega)
+    resumen = nombre_pedido(pedido)
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").split(",")[0].rstrip("/")
     logo_url = f"{frontend_url}/logo.png"
     nombre_medio = escape(instrucciones["titulo"])
@@ -126,7 +148,7 @@ def enviar_confirmacion_pedido(pedido, medio, pago_confirmado=False):
             + (f" ({pedido.distancia_envio_km} km por ruta)" if pedido.distancia_envio_km is not None else "")
         )
     texto = (
-        f"Hola, {estado_texto} tu pedido #{pedido.id}.\n\n"
+        f"Hola, {estado_texto} tu compra: {resumen}.\nReferencia: {pedido.id}.\n\n"
         + "\n".join(lineas_texto)
         + f"\n\nProductos: ${subtotal:,.0f}\nEnvío: ${costo_envio:,.0f}\nTotal: ${pedido.total:,.0f}\nEntrega: {detalle_entrega}\nMedio elegido: {instrucciones['titulo']}\n\n{instrucciones_texto}\n"
     )
@@ -134,7 +156,9 @@ def enviar_confirmacion_pedido(pedido, medio, pago_confirmado=False):
     <div style="margin:0;background:#111;color:#f5f0e8;padding:32px;font-family:Arial,sans-serif">
       <div style="max-width:560px;margin:auto;background:#1b1b1b;border:1px solid #333;padding:28px">
         <img src="{escape(logo_url)}" alt="Ragnar Suplementos" width="140" style="display:block;margin:0 auto 24px;max-height:90px;object-fit:contain">
-        <h1 style="color:#f3a712;font-size:24px">{escape(instrucciones['titulo'])}: pedido #{pedido.id}</h1>
+        <h1 style="color:#f04452;font-size:24px">{escape(instrucciones['titulo'])}</h1>
+        <h2 style="font-size:20px">{escape(resumen)}</h2>
+        <p style="font-size:12px">Referencia: {pedido.id}</p>
         <p>{escape(instrucciones['mensaje'])}</p>
         <ul style="padding-left:18px">{''.join(lineas_html)}</ul>
         <p style="font-size:18px"><strong>Total:</strong> ${pedido.total:,.0f}</p>
@@ -147,7 +171,7 @@ def enviar_confirmacion_pedido(pedido, medio, pago_confirmado=False):
     </div>
     """
     mensaje = EmailMultiAlternatives(
-        subject=f"{instrucciones['titulo']}: pedido #{pedido.id} — Ragnar Suplementos",
+        subject=f"{instrucciones['titulo']}: {resumen[:160]} — Ragnar Suplementos",
         body=texto,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[pedido.email_comprador],

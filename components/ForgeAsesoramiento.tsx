@@ -57,12 +57,12 @@ export default function ForgeAsesoramiento() {
       aria-labelledby="asesoramiento-titulo"
       className="scroll-mt-28 border-t border-carbon-line bg-carbon-raised/40"
     >
-      <div className="mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:gap-20">
-        <div>
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-20">
+        <div className="min-w-0">
           <span className="forge-eyebrow">HABLEMOS DE TU PRÓXIMO OBJETIVO</span>
           <h2
             id="asesoramiento-titulo"
-            className="forge-title mt-5 max-w-[13ch] text-5xl uppercase sm:text-6xl lg:text-7xl"
+            className="forge-title mt-5 max-w-[13ch] text-4xl uppercase sm:text-5xl xl:text-6xl"
           >
             ¿QUERÉS QUE TE <span className="text-ember">ASESOREMOS?</span>
           </h2>
@@ -86,7 +86,7 @@ export default function ForgeAsesoramiento() {
           </p>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-carbon-line bg-carbon-raised p-6 shadow-[0_24px_64px_rgba(0,0,0,.12)] sm:p-9">
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-carbon-line bg-carbon-raised p-6 shadow-[0_24px_64px_rgba(0,0,0,.12)] sm:p-9">
           <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-ember via-ember-bright to-transparent" aria-hidden="true" />
 
           {solicitudId !== null ? (

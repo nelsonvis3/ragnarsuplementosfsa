@@ -9,6 +9,8 @@
 **/__pycache__/
 *.py[cod]
 backend/db.sqlite3
+backend/emails-locales/
+backend/staticfiles/
 /.pnp
 .pnp.*
 .yarn/*
@@ -41,6 +43,9 @@ yarn-error.log*
 .env*
 !.env.example
 !.env.local.example
+!.env.production.example
+/deploy/backups/
+/deploy/certificates/
 
 # vercel
 .vercel

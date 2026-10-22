@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ArrowUpRight, Boxes, Eye, EyeOff, LockKeyhole, Package, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import {
-  ApiError, eliminarArticuloAdministracion, guardarArticuloAdministracion, iniciarSesion,
+  ApiError, crearCategoria, eliminarArticuloAdministracion, guardarArticuloAdministracion, iniciarSesion,
   listarCatalogoAdministracion, obtenerPerfil,
   type ArticuloAdministracion, type ImagenSaborUpload, type RecursoAdministracion, type Usuario,
 } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
+import CategoriasPanel from "@/components/admin/CategoriasPanel";
 import ArticuloForm from "@/components/admin/ArticuloForm";
+import PedidosPanel from "@/components/admin/PedidosPanel";
 
 type Catalogo = Awaited<ReturnType<typeof listarCatalogoAdministracion>>;
 type Editor = { articulo: ArticuloAdministracion | null; recurso: RecursoAdministracion };
@@ -52,7 +54,7 @@ function AccesoAdministracion() {
     <section className="mx-auto mt-10 max-w-md rounded-2xl border border-carbon-line bg-carbon-raised p-6 sm:p-8">
       <LockKeyhole size={28} className="text-ember" />
       <h2 className="mt-5 font-display text-2xl font-semibold">Acceso administrativo</h2>
-      <p className="mt-2 text-sm leading-6 text-bone-dim">Ingresá con la cuenta que administra Ragnar para gestionar el catálogo.</p>
+      <p className="mt-2 text-sm leading-6 text-bone-dim">Ingresá con la cuenta que administra Ragnar para gestionar el catálogo y los pedidos.</p>
       <form method="post" onSubmit={ingresar} className="mt-6 space-y-5">
         <label className="block text-sm font-medium" htmlFor="admin-usuario">Usuario o email
           <input id="admin-usuario" name="usuario" autoComplete="username" required className="mt-2 w-full border border-carbon-line bg-carbon px-3 py-3 outline-none focus:border-ember" />
@@ -166,10 +168,11 @@ function CatalogoPanel({ token }: { token: string }) {
     && (estado === "todos" || (estado === "publicados" ? a.activo : estado === "borradores" ? !a.activo : a.stock === 0))
   ));
 
-  if (editor) return <ArticuloForm key={`${editor.recurso}-${editor.articulo?.id ?? "nuevo"}`} recurso={editor.recurso} articulo={editor.articulo} productos={catalogo.productos} guardando={ocupado} error={error} onCancelar={() => { setEditor(null); void actualizarListado(); }} onGuardar={guardar} />;
+  if (editor) return <ArticuloForm key={`${editor.recurso}-${editor.articulo?.id ?? "nuevo"}`} recurso={editor.recurso} articulo={editor.articulo} productos={catalogo.productos} categorias={catalogo.categorias} guardando={ocupado} error={error} onCancelar={() => { setEditor(null); void actualizarListado(); }} onGuardar={guardar} />;
 
   return (
     <>
+      <CategoriasPanel categorias={catalogo.categorias} onCrear={async (nombre) => { const categoria = await crearCategoria(token, nombre); setCatalogo((actual) => actual ? { ...actual, categorias: [...actual.categorias, categoria] } : actual); }} />
       <div className="mt-8 grid gap-3 sm:grid-cols-3">
         {[{ nombre: "Productos publicados", valor: catalogo.productos.filter((p) => p.activo).length, Icono: Package }, { nombre: "Productos sin stock", valor: catalogo.productos.filter((p) => p.activo && p.stock === 0).length, Icono: Boxes }, { nombre: "Combos publicados", valor: catalogo.combos.filter((c) => c.activo).length, Icono: Eye }].map(({ nombre, valor, Icono }) => <div key={nombre} className="flex items-center justify-between gap-4 border border-carbon-line bg-carbon-raised p-5"><div><p className="text-xs text-bone-dim">{nombre}</p><p className="mt-2 font-display text-3xl font-semibold">{valor}</p></div><Icono size={22} className="text-ember" /></div>)}
       </div>
@@ -207,6 +210,16 @@ function CatalogoPanel({ token }: { token: string }) {
   );
 }
 
+function PanelTienda({ token }: { token: string }) {
+  const [seccion, setSeccion] = useState<"catalogo" | "pedidos">("catalogo");
+  return <>
+    <div className="mt-8 flex gap-3 border-b border-carbon-line pb-4" role="group" aria-label="Sección de administración">
+      {(["catalogo", "pedidos"] as const).map((valor) => <button key={valor} type="button" aria-pressed={seccion === valor} onClick={() => setSeccion(valor)} className={`rounded-lg border px-5 py-3 text-sm font-semibold ${seccion === valor ? "border-ember bg-ember text-white" : "border-carbon-line text-bone-dim hover:text-bone"}`}>{valor === "catalogo" ? "Catálogo" : "Pedidos"}</button>)}
+    </div>
+    {seccion === "catalogo" ? <CatalogoPanel token={token} /> : <PedidosPanel token={token} />}
+  </>;
+}
+
 export default function AdministracionCatalogo() {
   const token = useAuthStore((state) => state.token);
   const usuario = useAuthStore((state) => state.usuario);
@@ -236,8 +249,8 @@ export default function AdministracionCatalogo() {
   return (
     <main className="flex-1">
       <div className="mx-auto max-w-6xl px-5 py-10 sm:py-14">
-        <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-medium uppercase tracking-widest text-ember">Ragnar / Administración</p><h1 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">Tu tienda, en orden.</h1><p className="mt-3 text-sm leading-6 text-bone-dim">Gestioná productos, imágenes, precios y stock desde un solo lugar.</p></div><Link href="/productos" className="flex items-center gap-2 text-sm text-bone-dim hover:text-ember">Ir a la tienda <ArrowUpRight size={17} /></Link></div>
-        {!token ? <AccesoAdministracion /> : error?.token === token ? <div className="mt-10"><p role="alert" className="text-ember">{error.mensaje}</p><button onClick={() => setRevision((r) => r + 1)} className="mt-4 border border-carbon-line px-4 py-2 text-sm">Reintentar</button></div> : perfil?.token !== token || !sesionVerificada ? <p role="status" className="mt-10 text-bone-dim">Verificando acceso…</p> : !usuario?.puede_administrar_catalogo ? <div className="mt-10 border border-carbon-line bg-carbon-raised p-6"><h2 className="font-display text-xl">Tu cuenta no tiene acceso administrativo.</h2><p className="mt-2 text-sm text-bone-dim">Ingresá con la cuenta que gestiona el catálogo de Ragnar.</p><button onClick={cerrarSesion} className="mt-5 border border-ember px-4 py-2 text-sm text-ember">Ingresar con otra cuenta</button></div> : <CatalogoPanel key={token} token={token} />}
+        <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-medium uppercase tracking-widest text-ember">Ragnar / Administración</p><h1 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">Tu tienda, en orden.</h1><p className="mt-3 text-sm leading-6 text-bone-dim">Gestioná el catálogo, el stock y los pedidos desde un solo lugar.</p></div><Link href="/productos" className="flex items-center gap-2 text-sm text-bone-dim hover:text-ember">Ir a la tienda <ArrowUpRight size={17} /></Link></div>
+        {!token ? <AccesoAdministracion /> : error?.token === token ? <div className="mt-10"><p role="alert" className="text-ember">{error.mensaje}</p><button onClick={() => setRevision((r) => r + 1)} className="mt-4 border border-carbon-line px-4 py-2 text-sm">Reintentar</button></div> : perfil?.token !== token || !sesionVerificada ? <p role="status" className="mt-10 text-bone-dim">Verificando acceso…</p> : !usuario?.puede_administrar_catalogo ? <div className="mt-10 border border-carbon-line bg-carbon-raised p-6"><h2 className="font-display text-xl">Tu cuenta no tiene acceso administrativo.</h2><p className="mt-2 text-sm text-bone-dim">Ingresá con la cuenta que gestiona el catálogo de Ragnar.</p><button onClick={cerrarSesion} className="mt-5 border border-ember px-4 py-2 text-sm text-ember">Ingresar con otra cuenta</button></div> : <PanelTienda key={token} token={token} />}
       </div>
     </main>
   );

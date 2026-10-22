@@ -1,5 +1,7 @@
 # Variables y despliegue
 
+El despliegue objetivo actual está documentado en [VPS + Docker + Nginx](VPS-DOCKER.md). Render se conserva como alternativa anterior.
+
 ## Variables de Django (`.env`)
 
 La plantilla es [`.env.example`](../.env.example). No subas credenciales reales al repositorio.
@@ -16,10 +18,12 @@ La plantilla es [`.env.example`](../.env.example). No subas credenciales reales 
 | `PAGO_ALIAS`, `PAGO_CVU`, `PAGO_TITULAR` | Transferencia a Personal Pay. Hace falta alias o CVU para mostrarla |
 | `LOCAL_INSTRUCCIONES`, `ENVIO_PAGO_EFECTIVO_INSTRUCCIONES` | Textos para pagos en el local o al recibir |
 | `ENVIO_ORIGEN`, `ENVIO_TARIFAS_KM_ARS`, `OSM_CONTACT_EMAIL` | Origen de los envíos, tarifas por tramos (`km:pesos`) y contacto para OpenStreetMap |
-| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | SMTP. En desarrollo los mails salen por la terminal |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | SMTP. En desarrollo los mails salen por la terminal |
 | `PASSWORD_RESET_FRONTEND_URL`, `EMAIL_CONFIRMATION_FRONTEND_URL` | Origen de los links de recuperación y confirmación. Por defecto, el primero de `FRONTEND_URL` |
 | `CLOUDINARY_URL` | Cuenta de Cloudinary para las imágenes del panel |
 | `DJANGO_SECURE_SSL_REDIRECT`, `DJANGO_SECURE_HSTS_SECONDS`, `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS`, `DJANGO_SECURE_HSTS_PRELOAD` | Redirección a HTTPS y HSTS |
+
+En Docker, `REDIS_URL` configura la caché compartida y `API_INTERNAL_URL` conecta el renderizado servidor de Next.js con Django. `CORS_ALLOWED_ORIGIN_REGEXES` es opcional; los orígenes exactos de `FRONTEND_URL` son suficientes.
 
 El frontend usa `NEXT_PUBLIC_API_URL` en `.env.local` (plantilla: [`.env.local.example`](../.env.local.example)). Se fija al compilar, así que cambiarla exige otro build.
 

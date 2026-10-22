@@ -1,0 +1,13 @@
+FROM python:3.14-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home ragnar
+COPY --chown=ragnar:ragnar backend ./backend
+COPY --chown=ragnar:ragnar public/logo.png ./public/logo.png
+COPY --chown=ragnar:ragnar deploy/worker.py ./deploy/worker.py
+RUN DJANGO_DEBUG=true DATABASE_URL=sqlite:////tmp/build.sqlite3 python backend/manage.py collectstatic --noinput
+USER ragnar
+WORKDIR /app/backend
+EXPOSE 8000
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "2", "--timeout", "120", "--access-logfile", "-", "--access-logformat", "%(h)s %(m)s %(U)s %(s)s %(b)s %(L)s", "--error-logfile", "-"]

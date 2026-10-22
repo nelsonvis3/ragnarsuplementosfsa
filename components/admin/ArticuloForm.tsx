@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Plus, Upload, X } from "lucide-react";
-import type { ArticuloAdministracion, ImagenSaborUpload, ProductoAdministracion, RecursoAdministracion } from "@/lib/api";
+import type { Categoria, ArticuloAdministracion, ImagenSaborUpload, ProductoAdministracion, RecursoAdministracion } from "@/lib/api";
 import type { Sabor } from "@/types/producto";
 import ImagenSabor from "@/components/admin/ImagenSabor";
 
@@ -19,13 +19,14 @@ interface Props {
   recurso: RecursoAdministracion;
   articulo: ArticuloAdministracion | null;
   productos: ProductoAdministracion[];
+  categorias: Categoria[];
   guardando: boolean;
   error: string | null;
   onCancelar: () => void;
   onGuardar: (datos: Record<string, unknown>, imagen: File | null, imagenesSabores: ImagenSaborUpload[]) => Promise<void>;
 }
 
-export default function ArticuloForm({ recurso, articulo, productos, guardando, error, onCancelar, onGuardar }: Props) {
+export default function ArticuloForm({ recurso, articulo, productos, categorias, guardando, error, onCancelar, onGuardar }: Props) {
   const esProducto = recurso === "productos";
   const producto = articulo && "categoria" in articulo ? articulo : null;
   const [nombre, setNombre] = useState(articulo?.nombre ?? "");
@@ -61,6 +62,7 @@ export default function ArticuloForm({ recurso, articulo, productos, guardando, 
 
   async function enviar(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (guardando) return;
     setErrorLocal(null);
     if (!esProducto && componentes.length === 0) {
       setErrorLocal("Elegí al menos un producto para el combo.");
@@ -127,8 +129,11 @@ export default function ArticuloForm({ recurso, articulo, productos, guardando, 
               </label>}
             </div>
             {esProducto && <label className="block text-sm font-medium" htmlFor="articulo-categoria">Categoría
-              <input id="articulo-categoria" required maxLength={80} list="categorias-catalogo" value={categoria} onChange={(e) => setCategoria(e.target.value)} className={inputClass} placeholder="Ej. creatinas" />
-              <datalist id="categorias-catalogo">{Array.from(new Set([...productos.map((p) => p.categoria), "proteinas", "creatinas", "pre-entreno", "vitaminas", "alimentos"])).sort().map((c) => <option key={c} value={c} />)}</datalist>
+              <select id="articulo-categoria" required value={categoria} onChange={(e) => setCategoria(e.target.value)} className={inputClass}>
+                <option value="">Elegí una categoría</option>
+                {categorias.map((c) => <option key={c.id} value={c.slug}>{c.nombre}</option>)}
+              </select>
+              <span className="mt-1 block text-xs font-normal text-bone-dim">Podés crear categorías desde el listado del panel.</span>
             </label>}
             <label className="block text-sm font-medium" htmlFor="articulo-descripcion">Descripción
               <textarea id="articulo-descripcion" rows={4} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} className={inputClass} />
@@ -147,7 +152,7 @@ export default function ArticuloForm({ recurso, articulo, productos, guardando, 
               <h3 className="text-sm font-medium">Productos incluidos</h3><p className="mt-1 text-xs leading-5 text-bone-dim">Una unidad de cada producto. El stock del combo depende de sus componentes; todos deben estar publicados para venderlo.</p>
               <div className="mt-3 max-h-64 overflow-y-auto border border-carbon-line p-3">
                 {productos.length === 0 && <p className="text-sm text-bone-dim">Primero creá los productos que va a incluir este combo.</p>}
-                {productos.map((p) => <label key={p.id} className="flex cursor-pointer items-center gap-3 border-b border-carbon-line py-3 last:border-b-0"><input type="checkbox" checked={componentes.includes(p.id)} onChange={(e) => setComponentes(e.target.checked ? [...componentes, p.id] : componentes.filter((id) => id !== p.id))} className="accent-ember" /><span className="text-sm">{p.nombre}<span className="ml-2 text-xs text-bone-dim">{p.activo ? `Stock: ${p.stock}` : "Despublicado"}</span></span></label>)}
+                {productos.map((p) => <label key={p.id} className="flex cursor-pointer items-center gap-3 border-b border-carbon-line py-3 last:border-b-0"><input type="checkbox" checked={componentes.includes(p.id)} onChange={(e) => setComponentes(e.target.checked ? [...componentes, p.id] : componentes.filter((id) => id !== p.id))} className="accent-ember" /><Image src={p.imagen} alt="" width={36} height={48} unoptimized className="h-12 w-9 shrink-0 object-contain" /><span className="text-sm">{p.nombre}<span className="ml-2 text-xs text-bone-dim">{p.activo ? `Stock: ${p.stock}` : "Despublicado"}</span></span></label>)}
               </div>
             </div>}
             <label className="block text-sm font-medium" htmlFor="articulo-slug">Dirección en la tienda

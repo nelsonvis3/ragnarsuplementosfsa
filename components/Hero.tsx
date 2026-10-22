@@ -25,8 +25,8 @@ export default function Hero() {
             </Link>
           </div>
           <div className="mt-10 flex flex-wrap gap-8 border-t border-white/15 pt-5 text-xs uppercase tracking-[.13em] text-[#c5babd]">
-            <span className="inline-flex items-center gap-2"><ShieldCheck className="text-[#f04452]" size={18}/> Productos originales</span>
-            <span className="inline-flex items-center gap-2"><Zap className="text-[#f04452]" size={18}/> Entregas en Formosa</span>
+            <span className="inline-flex items-center gap-2"><ShieldCheck className="text-[#f04452]" size={18}/> Productos de Alta calidad</span>
+            <span className="inline-flex items-center gap-2"><Zap className="text-[#f04452]" size={18}/> Entregas en todo Formosa</span>
           </div>
         </div>
         <div className="forge-hero-art z-10 flex items-center justify-center lg:translate-x-6" aria-label="Suplementos deportivos">

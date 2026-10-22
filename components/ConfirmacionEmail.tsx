@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { ApiError, confirmarEmail, reenviarConfirmacionEmail } from "@/lib/api";
 import Logo from "@/components/Logo";
+import { useAuthStore } from "@/store/auth-store";
 
 const suscribirHidratacion = () => () => {};
 const clienteListo = () => true;
@@ -56,7 +57,10 @@ export default function ConfirmacionEmail() {
   const token = new URLSearchParams(fragmento.slice(1)).get("token") ?? "";
   const [confirmado, setConfirmado] = useState("");
   const [error, setError] = useState("");
-  const [cargando, setCargando] = useState(false);
+  const [intento, setIntento] = useState(0);
+  const guardarSesion = useAuthStore((state) => state.iniciarSesion);
+  const peticion = useRef<{ token: string; intento: number; promesa: ReturnType<typeof confirmarEmail> } | null>(null);
+  const cargando = Boolean(token && !confirmado && !error);
 
   useEffect(() => {
     function limpiar() { setConfirmado(""); setError(""); }
@@ -64,35 +68,42 @@ export default function ConfirmacionEmail() {
     return () => window.removeEventListener("hashchange", limpiar);
   }, []);
 
-  async function confirmar() {
-    setCargando(true);
-    setError("");
-    try {
-      const respuesta = await confirmarEmail(token);
-      if (window.location.hash !== fragmento) return;
-      setConfirmado(respuesta.detail);
+  useEffect(() => {
+    if (!listo || !token) return;
+    let vigente = true;
+    // Reutilizar la promesa evita consumir dos veces el enlace en StrictMode.
+    if (!peticion.current || peticion.current.token !== token || peticion.current.intento !== intento) {
+      peticion.current = { token, intento, promesa: confirmarEmail(token) };
+    }
+    void peticion.current.promesa.then((respuesta) => {
+      if (!vigente || window.location.hash !== fragmento) return;
+      guardarSesion(respuesta.token, respuesta.usuario);
       window.history.replaceState(null, "", window.location.pathname);
-    } catch (err) {
-      if (window.location.hash === fragmento) setError(mensajeError(err));
-    } finally { setCargando(false); }
-  }
+      setConfirmado(respuesta.detail);
+      peticion.current = null;
+    }).catch((err: unknown) => {
+      if (vigente && window.location.hash === fragmento) setError(mensajeError(err));
+    });
+    return () => { vigente = false; };
+  }, [listo, token, fragmento, intento, guardarSesion]);
 
   return (
     <main className="flex flex-1 items-center justify-center px-5 py-16">
       <div className="w-full max-w-md border border-carbon-line bg-carbon-raised p-6 sm:p-8">
         <div className="flex justify-center"><Logo width={36} height={59} className="h-10 w-auto" /></div>
-        <h1 className="mt-6 font-display text-2xl font-semibold">{confirmado ? "¡Tu email está confirmado!" : token ? "Confirmá tu e-mail" : "Reenviar confirmación"}</h1>
+        <h1 className="mt-6 font-display text-2xl font-semibold">{confirmado ? "¡Ya estás dentro!" : token ? "Activá tu cuenta" : "Reenviar confirmación"}</h1>
         {confirmado ? (
           <p role="status" className="mt-4 border border-carbon-line p-4 text-sm leading-6">{confirmado}</p>
         ) : (
           <>
-            <p className="mt-3 text-sm leading-6 text-bone-dim">{token ? "Estás a un paso de desbloquear tu potencial. Confirmá tu email para activar tu cuenta en Ragnar." : "Ingresá el email con el que te registraste para recibir un nuevo enlace de confirmación."}</p>
+            <p className="mt-3 text-sm leading-6 text-bone-dim">{token ? "Estamos confirmando tu email e iniciando tu sesión en Ragnar." : "Ingresá el email con el que te registraste para recibir un nuevo enlace de confirmación."}</p>
             {error && <p role="alert" className="mt-4 border border-ember/40 bg-ember/10 p-3 text-sm text-ember">{error}</p>}
-            {token && <button type="button" disabled={!listo || cargando} onClick={confirmar} className="mt-6 w-full bg-ember px-4 py-3 text-sm font-semibold text-carbon hover:bg-ember-bright disabled:opacity-60">{cargando ? "Confirmando…" : "Confirmar e-mail"}</button>}
+            {cargando && <p role="status" className="mt-6 text-sm text-bone-dim">Confirmando tu cuenta…</p>}
+            {token && error && <button type="button" onClick={() => { setError(""); setIntento((valor) => valor + 1); }} className="mt-6 w-full bg-ember px-4 py-3 text-sm font-semibold text-white hover:bg-ember-bright">Reintentar confirmación</button>}
             {listo && (!token || error) && <ReenviarConfirmacion />}
           </>
         )}
-        <p className="mt-6 text-center text-sm text-bone-dim"><Link href="/login" className="hover:text-ember">{confirmado ? "Iniciar sesión" : "Volver a iniciar sesión"}</Link></p>
+        <p className="mt-6 text-center text-sm text-bone-dim"><Link href={confirmado ? "/productos" : "/login"} className="hover:text-ember">{confirmado ? "Explorar suplementos" : "Volver a iniciar sesión"}</Link></p>
       </div>
     </main>
   );
