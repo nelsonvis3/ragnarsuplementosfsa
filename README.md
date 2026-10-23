@@ -1,85 +1,87 @@
 # Ragnar Suplementos
 
-**E-commerce Full Stack para una tienda de suplementación deportiva en Formosa, Argentina.**
+**A full-stack e-commerce application built for a sports nutrition business in Formosa, Argentina.**
 
-Ragnar combina una experiencia de compra responsive con un catálogo administrable, control de stock compartido, cálculo de envíos y distintas formas de pago. La interfaz **Ragnar Forge** prioriza una navegación clara desde el descubrimiento del producto hasta la confirmación del pedido.
+Ragnar Suplementos connects a responsive storefront to an administrative system for products, bundles, stock, orders, and customer accounts. The central challenge was giving the business owner control over the catalog while keeping prices and inventory consistent throughout checkout.
 
-## Funcionalidades
+**[Portfolio case study](https://nelsonsivisstum.vercel.app/en/projects/ragnar-suplementos/)** · **[API reference](docs/API.md)** · **[Deployment guide](docs/VPS-DOCKER.md)**
 
-**Tienda**
-- Catálogo de productos por categoría, variantes de sabor con imágenes y combos.
-- Destacados automáticos por unidades vendidas en pedidos aprobados, incluyendo componentes históricos de combos.
-- Tarjetas de producto, búsqueda y filtros; detalle de producto con selección de sabor y cantidad.
-- Carrito persistente con Zustand, vista rápida lateral y checkout en la página `/carrito`.
-- Compra con cuenta registrada y email confirmado: registro, confirmación de email y recuperación de contraseña.
-- Retiro en el local o entrega dentro de Formosa, con cotización de envío según distancia.
-- Pago con Mercado Pago (si está configurado), transferencia o efectivo, según disponibilidad.
-- Formulario de asesoramiento y solicitudes de consulta, reclamo o arrepentimiento.
+> **Project status:** The application and its administrative workflows have been developed and tested in isolated environments. A production VPS deployment, public domain, and payment-provider acceptance tests are **not yet complete**. Do not treat this repository as an operating public store.
 
-**Administración**
-- Panel en `/administracion` para publicar y editar productos, combos, precios, stock y fotografías; creación de categorías con nombres únicos.
-- Gestión de pedidos en `/administracion`: búsqueda por producto, cliente o referencia, filtros por estado, detalle de compra, confirmación de pagos manuales y cancelación con devolución del stock reservado. Django Admin conserva las mismas operaciones.
-- Validación del inventario y del importe del pedido en el servidor.
+## Screenshots
 
-## Tecnologías
+| Product details | Shopping cart | Administration |
+| --- | --- | --- |
+| ![Ragnar product page](docs/capturas/producto.jpg) | ![Cart and checkout](docs/capturas/carrito.jpg) | ![Catalog and order administration](docs/capturas/administracion.jpg) |
 
-| Capa | Tecnologías |
+## What problem does it solve?
+
+The business needed to update its own inventory, prices, photos, and bundles without asking a developer for every change. A conventional storefront was not enough: the same product could also appear inside a bundle, so independently tracked quantities could lead to overselling. Ragnar keeps those rules on the Django backend instead of trusting values from the browser.
+
+## Features
+
+**Customers**
+- Browse products by category, search and filter the catalog, and choose flavor variants.
+- View bundles composed of products sharing the same inventory.
+- Use a persistent shopping cart and a dedicated checkout page.
+- Register, confirm an email address, sign in, and recover a password.
+- Request local delivery quotes or choose store pickup.
+- Choose available manual payment methods; Mercado Pago integration is configurable but requires provider credentials and end-to-end acceptance before real transactions.
+- Send a customer-service request or request product advice.
+
+**Store owner**
+- Manage categories, products, variants, bundles, images, pricing, and stock through `/administracion`.
+- Search and filter orders, inspect their recorded items, and perform permitted order-state transitions.
+- Review manually confirmed payments and cancel eligible orders with inventory restoration.
+- Access Django Admin for the underlying records and customer-service requests.
+
+## Technology
+
+| Layer | Technologies |
 | --- | --- |
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
-| Estado | Zustand con persistencia local del carrito |
+| Client state | Zustand (persistent cart) |
 | Backend | Python, Django 6, Django REST Framework, Simple JWT |
-| Datos | PostgreSQL en producción; SQLite para desarrollo |
-| Integraciones | Mercado Pago, Cloudinary, Resend (HTTPS) o SMTP, OpenStreetMap (Nominatim y OSRM) |
+| Database | PostgreSQL for the prepared production configuration; SQLite for local development |
+| Infrastructure | Docker Compose, Nginx, Gunicorn, Redis |
+| Integrations | Mercado Pago (optional), Cloudinary, email via SMTP or Resend, OpenStreetMap routing/geocoding |
 
-## Arquitectura y decisiones técnicas
+## Engineering decisions
 
-- **El backend es la fuente de verdad.** El frontend no fija precios finales ni stock: Django vuelve a validar artículos, disponibilidad y totales durante el checkout.
-- **Stock compartido entre productos y combos.** Cada combo consume el inventario de sus componentes, evitando vender dos veces la misma unidad.
-- **Checkout idempotente.** Una clave de intento de compra ayuda a evitar pedidos duplicados ante reintentos o doble clic.
-- **Reservas y conciliación de pagos.** Los pedidos reservan unidades durante un plazo configurable. Las notificaciones de Mercado Pago se validan en el servidor y los casos inconsistentes requieren revisión.
-- **Separación de responsabilidades.** Next.js presenta la experiencia de compra; Django expone las APIs y administra las reglas de negocio.
+**The server owns prices and stock.** Django recalculates order totals from database records, validates availability, and rejects inconsistent checkout requests. The frontend cannot dictate final amounts.
 
-## Estructura
+**Products and bundles share inventory.** A bundle consumes stock from its constituent products. Locks and an ordered locking strategy help prevent concurrent purchases from reserving the same last unit.
 
-```text
-app/                 Páginas Next.js: inicio, catálogo, combos, carrito, cuenta
-components/          Interfaz, navegación, formularios y componentes de compra
-store/               Estado de autenticación y carrito
-lib/                 Cliente HTTP de la API Django
-types/               Tipos TypeScript
-public/              Identidad visual e imágenes de productos
-backend/             API REST, modelos, pedidos, pagos, envíos y administración
-docs/                Referencia de API e instrucciones de despliegue
-```
+**Checkout is designed for retries.** A checkout key detects duplicate attempts, while the order preserves purchased item names, prices, and quantities even if the catalog changes later.
 
-## Ejecutar localmente
+**Administrative actions follow the order lifecycle.** Order-management requests validate permissions, state transitions, and record versions; sensitive operations are written transactionally.
 
-Requisitos: **Node.js 20.9 o superior** y **Python 3.12 o superior**.
+See [the API reference](docs/API.md) for routes, authentication, errors, and administrative actions, and the [October 21 audit](docs/AUDITORIA-2026-10-21.md) for specific fixes and validation limits.
 
-**1. Backend**
+## Run locally
 
-Desde la raíz del repositorio:
+**Requirements:** Node.js 20.9+ and Python 3.12+. No production payment or email credentials are needed to inspect the application locally.
+
+Clone the repository and create the backend configuration:
 
 ```bash
+git clone https://github.com/nelsonvis3/ragnarsuplementosfsa.git
+cd ragnarsuplementosfsa
 cp .env.example .env
 python -m venv backend/.venv
 ```
 
-Activá el entorno virtual con `source backend/.venv/bin/activate` en Bash/Zsh o con `source backend/.venv/bin/activate.fish` en Fish.
+Activate the virtual environment with `source backend/.venv/bin/activate` (Bash/Zsh) or `source backend/.venv/bin/activate.fish` (Fish). Start Django from the repository root:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python backend/manage.py migrate
 python backend/manage.py ensure_catalogo
 python backend/manage.py createsuperuser
 python backend/manage.py runserver
 ```
 
-Sin `DATABASE_URL`, Django usa SQLite. `ensure_catalogo` puede preparar artículos con stock cero; las cantidades reales se configuran desde administración.
-
-**2. Frontend**
-
-En otra terminal, también desde la raíz:
+In another terminal, still in the repository root, start Next.js:
 
 ```bash
 npm ci
@@ -87,11 +89,11 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Abrí **http://localhost:3000**. La API utiliza por defecto **http://127.0.0.1:8000**.
+Open **http://localhost:3000**; the default API runs at **http://127.0.0.1:8000**. Without `DATABASE_URL`, Django uses local SQLite. The initial catalog may contain items with **zero stock**; use the administrative interface to enter real quantities before trying checkout.
 
-> Podés visualizar el diseño del frontend sin iniciar Django, pero el catálogo dinámico, el carrito con precios actualizados, el formulario y el checkout necesitan la API activa.
+> In local development, emails normally appear in the backend terminal. External payments, image uploads, and delivery quotes require their respective services and configuration. Never commit real `.env` files or provider credentials.
 
-## Verificaciones
+## Tests and validation
 
 ```bash
 npm run lint
@@ -100,18 +102,24 @@ npm run build
 python backend/manage.py test
 ```
 
-El último comando necesita las dependencias de Python instaladas y el entorno configurado. Los flujos de pago y envío requieren además pruebas de integración con sus servicios correspondientes.
+The [October 21 audit](docs/AUDITORIA-2026-10-21.md) records a PostgreSQL suite with 76 passing tests at an earlier stage, followed by a SQLite run discovering 94 tests (92 passed, 2 skipped because they require PostgreSQL row locking). These are **historical local results**, not a claim about a fresh CI run or a live production installation. Payment providers and public hosting still need acceptance testing.
 
-## Documentación
+## Deployment and current limitations
 
-- [Auditoría, correcciones y validaciones del 21/10/2026](docs/AUDITORIA-2026-10-21.md)
+A [VPS plan using Docker Compose, Nginx, HTTPS, PostgreSQL, and Redis](docs/VPS-DOCKER.md) is prepared; a separate [Render + Neon demo alternative](docs/DESPLIEGUE-GRATIS.md) is also documented. Neither setup should be described as a verified public production deployment until its acceptance checklist is completed. In particular, real transactions require payment, email delivery, stock reconciliation, monitoring, backups, and restoration tests.
 
-- [Endpoints de la API](docs/API.md)
-- [VPS + Docker + Nginx y Gmail](docs/VPS-DOCKER.md)
-- [Variables de entorno y despliegue](docs/DESPLIEGUE.md)
-- [Deploy gratuito de prueba: Render + Neon](docs/DESPLIEGUE-GRATIS.md)
-- [Configuración de infraestructura](render.yaml)
+## Documentation
 
-## Uso del código
+- [HTTP API and permissions](docs/API.md)
+- [Technical audit and testing evidence](docs/AUDITORIA-2026-10-21.md)
+- [VPS / Docker / Nginx deployment plan](docs/VPS-DOCKER.md)
+- [Environment variables and deployment](docs/DESPLIEGUE.md)
+- [Free demo hosting alternative](docs/DESPLIEGUE-GRATIS.md)
 
-Repositorio público para mostrar la implementación y su arquitectura. No se incluye una licencia de reutilización; la marca, los logos y las imágenes de productos pertenecen a sus respectivos titulares.
+## About this project / Sobre el proyecto
+
+This is a real client-oriented project and a portfolio case study by **Nelson Sivisstum**. Business names, logos, and product imagery belong to their respective owners.
+
+*Ragnar Suplementos es una tienda full stack desarrollada para un negocio de suplementación de Formosa. Incluye catálogo, carrito, gestión de pedidos y un panel donde el propietario puede administrar productos, precios, imágenes y stock. El despliegue público y las pruebas con proveedores reales todavía están pendientes.*
+
+**License:** This repository does not declare an open-source license. Its public visibility does not grant permission to reuse the code, brand, or assets.
