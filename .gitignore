@@ -43,9 +43,20 @@ yarn-error.log*
 .env*
 !.env.example
 !.env.local.example
-!.env.production.example
-/deploy/backups/
-/deploy/certificates/
+
+# Privado: despliegue, hosting, auditorías, credenciales y archivos de agente/editor.
+# Quedan en la PC de Nelson; el repo público muestra solo la aplicación.
+/deploy/
+/compose.yaml
+/render.yaml
+/.dockerignore
+/scripts/render-build.mjs
+/docs/*
+!/docs/API.md
+!/docs/capturas/
+/AGENTS.md
+/CLAUDE.md
+/.vscode/
 
 # vercel
 .vercel

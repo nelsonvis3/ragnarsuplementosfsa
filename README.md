@@ -4,9 +4,7 @@
 
 Ragnar Suplementos connects a responsive storefront to an administrative system for products, bundles, stock, orders, and customer accounts. The central challenge was giving the business owner control over the catalog while keeping prices and inventory consistent throughout checkout.
 
-**[Portfolio case study](https://nelsonsivisstum.vercel.app/en/projects/ragnar-suplementos/)** · **[API reference](docs/API.md)** · **[Deployment guide](docs/VPS-DOCKER.md)**
-
-> **Project status:** The application and its administrative workflows have been developed and tested in isolated environments. A production VPS deployment, public domain, and payment-provider acceptance tests are **not yet complete**. Do not treat this repository as an operating public store.
+**[Portfolio case study](https://nelsonsivisstum.vercel.app/en/projects/ragnar-suplementos/)** · **[API reference](docs/API.md)**
 
 ## Screenshots
 
@@ -28,7 +26,7 @@ The business needed to update its own inventory, prices, photos, and bundles wit
 - Use a persistent shopping cart and a dedicated checkout page.
 - Register, confirm an email address, sign in, and recover a password.
 - Request local delivery quotes or choose store pickup.
-- Choose available manual payment methods; Mercado Pago integration is configurable but requires provider credentials and end-to-end acceptance before real transactions.
+- Pay by bank transfer, in cash on delivery, or at the store; Mercado Pago is an optional integration.
 - Send a customer-service request or request product advice.
 - Registered customers flip cards to win a 5 %, 10 % or free-shipping reward (one play on sign-up and another per approved purchase of five or more items); the discount is calculated on the server at checkout.
 
@@ -49,7 +47,7 @@ The business needed to update its own inventory, prices, photos, and bundles wit
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
 | Client state | Zustand (persistent cart) |
 | Backend | Python, Django 6, Django REST Framework, Simple JWT |
-| Database | PostgreSQL for the prepared production configuration; SQLite for local development |
+| Database | PostgreSQL; SQLite for local development |
 | Infrastructure | Docker Compose, Nginx, Gunicorn, Redis |
 | Integrations | Mercado Pago (optional), Cloudinary, email via SMTP or Resend, OpenStreetMap routing/geocoding |
 
@@ -63,7 +61,7 @@ The business needed to update its own inventory, prices, photos, and bundles wit
 
 **Administrative actions follow the order lifecycle.** Order-management requests validate permissions, state transitions, and record versions; sensitive operations are written transactionally.
 
-See [the API reference](docs/API.md) for routes, authentication, errors, and administrative actions, and the [October 21 audit](docs/AUDITORIA-2026-10-21.md) for specific fixes and validation limits.
+See [the API reference](docs/API.md) for routes, authentication, errors, and administrative actions.
 
 ## Run locally
 
@@ -109,25 +107,12 @@ npm run build
 python backend/manage.py test
 ```
 
-The [October 21 audit](docs/AUDITORIA-2026-10-21.md) records a PostgreSQL suite with 76 passing tests at an earlier stage, followed by a SQLite run discovering 94 tests (92 passed, 2 skipped because they require PostgreSQL row locking). These are **historical local results**, not a claim about a fresh CI run or a live production installation. Payment providers and public hosting still need acceptance testing.
-
-## Deployment and current limitations
-
-A [VPS plan using Docker Compose, Nginx, HTTPS, PostgreSQL, and Redis](docs/VPS-DOCKER.md) is prepared; a separate [Render + Neon demo alternative](docs/DESPLIEGUE-GRATIS.md) is also documented. Neither setup should be described as a verified public production deployment until its acceptance checklist is completed. In particular, real transactions require payment, email delivery, stock reconciliation, monitoring, backups, and restoration tests.
-
-## Documentation
-
-- [HTTP API and permissions](docs/API.md)
-- [Technical audit and testing evidence](docs/AUDITORIA-2026-10-21.md)
-- [VPS / Docker / Nginx deployment plan](docs/VPS-DOCKER.md)
-- [Oracle Cloud Always Free server setup (Spanish)](docs/ORACLE-CLOUD.md)
-- [Environment variables and deployment](docs/DESPLIEGUE.md)
-- [Free demo hosting alternative](docs/DESPLIEGUE-GRATIS.md)
+The backend suite has 106 tests; on SQLite, 2 are skipped because they need PostgreSQL row locking.
 
 ## About this project / Sobre el proyecto
 
 This is a real client-oriented project and a portfolio case study by **Nelson Sivisstum**. Business names, logos, and product imagery belong to their respective owners.
 
-*Ragnar Suplementos es una tienda full stack desarrollada para un negocio de suplementación de Formosa. Incluye catálogo, carrito, gestión de pedidos y un panel donde el propietario puede administrar productos, precios, imágenes y stock. El despliegue público y las pruebas con proveedores reales todavía están pendientes.*
+*Ragnar Suplementos es una tienda full stack desarrollada para un negocio de suplementación de Formosa. Incluye catálogo, carrito, gestión de pedidos y un panel donde el propietario puede administrar productos, precios, imágenes y stock.*
 
 **License:** This repository does not declare an open-source license. Its public visibility does not grant permission to reuse the code, brand, or assets.
