@@ -1,10 +1,9 @@
-import os
 from email.message import MIMEPart
-from html import escape
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from .models import ConfiguracionTienda
 from .order_summary import nombre_pedido
 
 
@@ -27,6 +26,22 @@ def enviar_consulta_asesoramiento(solicitud):
         raise RuntimeError("El proveedor no aceptó la notificación de la consulta.")
 
 
+def _pesos(valor):
+    return f"${valor:,.0f}".replace(",", ".")
+
+
+def _con_html(mensaje, plantilla, contexto):
+    """Agrega la versión HTML y el logo que la plantilla base referencia como cid:ragnar-logo."""
+    mensaje.attach_alternative(render_to_string(plantilla, contexto), "text/html")
+    logo = MIMEPart()
+    logo.set_content(
+        (settings.ROOT_DIR / "public" / "logo.png").read_bytes(),
+        maintype="image", subtype="png", disposition="inline", cid="<ragnar-logo>", filename="ragnar-logo.png",
+    )
+    mensaje.attach(logo)
+    return mensaje
+
+
 def enviar_bienvenida_registro(user, enlace):
     contexto = {"nombre": user.first_name, "enlace": enlace}
     mensaje = EmailMultiAlternatives(
@@ -35,13 +50,7 @@ def enviar_bienvenida_registro(user, enlace):
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[user.email],
     )
-    mensaje.attach_alternative(render_to_string("store/emails/bienvenida.html", contexto), "text/html")
-    logo = MIMEPart()
-    logo.set_content(
-        (settings.ROOT_DIR / "public" / "logo.png").read_bytes(),
-        maintype="image", subtype="png", disposition="inline", cid="<ragnar-logo>", filename="ragnar-logo.png",
-    )
-    mensaje.attach(logo)
+    _con_html(mensaje, "store/emails/bienvenida.html", contexto)
     if mensaje.send(fail_silently=False) != 1:
         raise RuntimeError("El proveedor no aceptó el correo de confirmación.")
 
@@ -55,23 +64,13 @@ def enviar_recuperacion_contrasena(user, enlace):
         "El enlace vence en una hora y se puede usar una sola vez.\n"
         "Si no pediste este cambio, ignorá el correo: tu contraseña sigue siendo la misma."
     )
-    html = f"""
-    <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px">
-      <h1 style="font-size:24px">Recuperar tu contraseña</h1>
-      <p>{escape(saludo)}</p>
-      <p>Recibimos una solicitud para cambiar tu contraseña de Ragnar Suplementos.</p>
-      <p><a href="{escape(enlace, quote=True)}">Elegir una nueva contraseña</a></p>
-      <p>El enlace vence en una hora y se puede usar una sola vez.</p>
-      <p>Si no pediste este cambio, ignorá el correo: tu contraseña sigue siendo la misma.</p>
-    </div>
-    """
     mensaje = EmailMultiAlternatives(
         subject="Recuperá tu contraseña — Ragnar Suplementos",
         body=texto,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[user.email],
     )
-    mensaje.attach_alternative(html, "text/html")
+    _con_html(mensaje, "store/emails/recuperacion.html", {"saludo": saludo, "enlace": enlace})
     mensaje.send(fail_silently=False)
 
 
@@ -84,12 +83,13 @@ def instrucciones_pago(medio, pago_confirmado=False, forma_entrega="retiro"):
             "titular": "",
             "mensaje": "Confirmamos el pago de tu pedido. Gracias por elegir Ragnar Suplementos.",
         }
+    tienda = ConfiguracionTienda.actual()
     if medio == "transferencia":
         return {
             "titulo": "Transferencia a Personal Pay",
-            "alias": os.getenv("PAGO_ALIAS", ""),
-            "cvu": os.getenv("PAGO_CVU", ""),
-            "titular": os.getenv("PAGO_TITULAR", ""),
+            "alias": tienda.valor("pago_alias", "PAGO_ALIAS"),
+            "cvu": tienda.valor("pago_cvu", "PAGO_CVU"),
+            "titular": tienda.valor("pago_titular", "PAGO_TITULAR"),
             "mensaje": "Una vez realizada la transferencia, envianos el comprobante por WhatsApp indicando el número de pedido.",
         }
     if forma_entrega == "envio":
@@ -98,8 +98,8 @@ def instrucciones_pago(medio, pago_confirmado=False, forma_entrega="retiro"):
             "alias": "",
             "cvu": "",
             "titular": "",
-            "mensaje": os.getenv(
-                "ENVIO_PAGO_EFECTIVO_INSTRUCCIONES",
+            "mensaje": tienda.valor(
+                "instrucciones_efectivo_envio", "ENVIO_PAGO_EFECTIVO_INSTRUCCIONES",
                 "Te contactaremos para coordinar el envío. Podés pagar en efectivo al recibirlo.",
             ),
         }
@@ -108,74 +108,47 @@ def instrucciones_pago(medio, pago_confirmado=False, forma_entrega="retiro"):
         "alias": "",
         "cvu": "",
         "titular": "",
-        "mensaje": os.getenv("LOCAL_INSTRUCCIONES", "Te contactaremos para coordinar el pago y el retiro de tu pedido."),
+        "mensaje": tienda.valor("instrucciones_local", "LOCAL_INSTRUCCIONES", "Te contactaremos para coordinar el pago y el retiro de tu pedido."),
     }
 
 
 def enviar_confirmacion_pedido(pedido, medio, pago_confirmado=False):
     instrucciones = instrucciones_pago(medio, pago_confirmado, pedido.forma_entrega)
     resumen = nombre_pedido(pedido)
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").split(",")[0].rstrip("/")
-    logo_url = f"{frontend_url}/logo.png"
-    nombre_medio = escape(instrucciones["titulo"])
-    lineas_texto = []
-    lineas_html = []
+    items = []
     for item in pedido.items.all():
         nombre = item.nombre + (f" ({item.sabor})" if item.sabor else "")
-        subtotal = item.precio_unitario * item.cantidad
-        lineas_texto.append(f"- {nombre} x{item.cantidad}: ${subtotal:,.0f}")
-        lineas_html.append(
-            f"<li style='padding:8px 0;border-bottom:1px solid #333'>{escape(nombre)} × {item.cantidad} — ${subtotal:,.0f}</li>"
-        )
+        items.append({"nombre": nombre, "cantidad": item.cantidad, "subtotal": _pesos(item.precio_unitario * item.cantidad)})
 
-    datos_transferencia = []
-    for etiqueta, clave in (("Titular", "titular"), ("Alias", "alias"), ("CVU", "cvu")):
-        if instrucciones[clave]:
-            datos_transferencia.append(f"{etiqueta}: {instrucciones[clave]}")
-    instrucciones_texto = "\n".join(datos_transferencia + [instrucciones["mensaje"]])
-    instrucciones_html = "".join(
-        f"<p><strong>{escape(etiqueta)}:</strong> {escape(instrucciones[clave])}</p>"
-        for etiqueta, clave in (("Titular", "titular"), ("Alias", "alias"), ("CVU", "cvu"))
-        if instrucciones[clave]
-    ) + f"<p>{escape(instrucciones['mensaje'])}</p>"
+    datos_pago = [(etiqueta, instrucciones[clave]) for etiqueta, clave in (("Titular", "titular"), ("Alias", "alias"), ("CVU", "cvu")) if instrucciones[clave]]
     estado_texto = "confirmamos el pago de" if pago_confirmado else "recibimos"
     costo_envio = pedido.costo_envio
-    subtotal = pedido.total - costo_envio
+    productos = pedido.total - costo_envio + pedido.descuento
     detalle_entrega = "Retiro en el local"
     if pedido.forma_entrega == "envio":
         detalle_entrega = (
             f"Envío a {pedido.direccion_entrega}"
             + (f" ({pedido.distancia_envio_km} km por ruta)" if pedido.distancia_envio_km is not None else "")
         )
+    lineas_texto = [f"- {i['nombre']} x{i['cantidad']}: {i['subtotal']}" for i in items]
+    instrucciones_texto = "\n".join([f"{etiqueta}: {valor}" for etiqueta, valor in datos_pago] + [instrucciones["mensaje"]])
     texto = (
         f"Hola, {estado_texto} tu compra: {resumen}.\nReferencia: {pedido.id}.\n\n"
         + "\n".join(lineas_texto)
-        + f"\n\nProductos: ${subtotal:,.0f}\nEnvío: ${costo_envio:,.0f}\nTotal: ${pedido.total:,.0f}\nEntrega: {detalle_entrega}\nMedio elegido: {instrucciones['titulo']}\n\n{instrucciones_texto}\n"
+        + f"\n\nProductos: {_pesos(productos)}\n"
+        + (f"Premio del juego: -{_pesos(pedido.descuento)}\n" if pedido.descuento else "")
+        + f"Envío: {_pesos(costo_envio)}\nTotal: {_pesos(pedido.total)}\nEntrega: {detalle_entrega}\nMedio elegido: {instrucciones['titulo']}\n\n{instrucciones_texto}\n"
     )
-    html = f"""
-    <div style="margin:0;background:#111;color:#f5f0e8;padding:32px;font-family:Arial,sans-serif">
-      <div style="max-width:560px;margin:auto;background:#1b1b1b;border:1px solid #333;padding:28px">
-        <img src="{escape(logo_url)}" alt="Ragnar Suplementos" width="140" style="display:block;margin:0 auto 24px;max-height:90px;object-fit:contain">
-        <h1 style="color:#f04452;font-size:24px">{escape(instrucciones['titulo'])}</h1>
-        <h2 style="font-size:20px">{escape(resumen)}</h2>
-        <p style="font-size:12px">Referencia: {pedido.id}</p>
-        <p>{escape(instrucciones['mensaje'])}</p>
-        <ul style="padding-left:18px">{''.join(lineas_html)}</ul>
-        <p style="font-size:18px"><strong>Total:</strong> ${pedido.total:,.0f}</p>
-        <p><strong>Productos:</strong> ${subtotal:,.0f}</p>
-        <p><strong>Envío:</strong> ${costo_envio:,.0f}</p>
-        <p><strong>Entrega:</strong> {escape(detalle_entrega)}</p>
-        <h2 style="font-size:17px">{nombre_medio}</h2>
-        {instrucciones_html}
-      </div>
-    </div>
-    """
     mensaje = EmailMultiAlternatives(
         subject=f"{instrucciones['titulo']}: {resumen[:160]} — Ragnar Suplementos",
         body=texto,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[pedido.email_comprador],
     )
-    mensaje.attach_alternative(html, "text/html")
+    _con_html(mensaje, "store/emails/pedido.html", {
+        "pedido": pedido, "resumen": resumen, "instrucciones": instrucciones, "estado_texto": estado_texto,
+        "items": items, "datos_pago": datos_pago, "entrega": detalle_entrega, "productos": _pesos(productos),
+        "descuento": _pesos(pedido.descuento) if pedido.descuento else "", "envio": _pesos(costo_envio), "total": _pesos(pedido.total),
+    })
     mensaje.send(fail_silently=False)
     return settings.EMAIL_BACKEND != "django.core.mail.backends.console.EmailBackend"

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{% block titulo %}Ragnar Suplementos{% endblock %}</title></head>
+<body style="margin:0;padding:0;background-color:#0b0d10;color:#f4f1ec;font-family:Arial,Helvetica,sans-serif;">
+  <div style="display:none;font-size:1px;color:#0b0d10;max-height:0;overflow:hidden;">{% block preheader %}{% endblock %}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0b0d10;">
+    <tr><td align="center" style="padding:24px 8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#171a20;border:1px solid #34363b;">
+        <tr><td align="center" style="padding:28px 20px 20px;border-bottom:1px solid #34363b;">
+          <img src="cid:ragnar-logo" alt="Logo de Ragnar Suplementos" width="58" height="95" style="display:block;border:0;object-fit:contain;">
+          <p style="margin:16px 0 0;color:#f4f1ec;font-size:20px;font-weight:bold;letter-spacing:4px;">RAGNAR</p>
+          <p style="margin:6px 0 0;color:#f04452;font-size:12px;letter-spacing:3px;">SUPLEMENTOS</p>
+        </td></tr>
+        <tr><td style="padding:28px 20px;">
+{% block contenido %}{% endblock %}
+        </td></tr>
+        <tr><td align="center" style="padding:20px;border-top:1px solid #34363b;color:#b8b2ae;font-size:12px;">Ragnar Suplementos · Fuerza que se nota.</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

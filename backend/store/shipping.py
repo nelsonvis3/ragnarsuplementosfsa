@@ -33,7 +33,11 @@ def destino_formateado(direccion, barrio=""):
 
 
 def tarifas_envio():
-    configuracion = os.getenv("ENVIO_TARIFAS_KM_ARS", "1:0,3:1000,5:2500,8:3500,12:5000")
+    from .models import ConfiguracionTienda
+    return parsear_tarifas(ConfiguracionTienda.actual().valor("envio_tarifas", "ENVIO_TARIFAS_KM_ARS", "1:0,3:1000,5:2500,8:3500,12:5000"))
+
+
+def parsear_tarifas(configuracion):
     tarifas = []
     try:
         for tramo in configuracion.split(","):

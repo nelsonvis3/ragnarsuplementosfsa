@@ -3,10 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Minus, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { Minus, Plus, Trash2, UserRound } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { useAuthStore } from "@/store/auth-store";
-import { ApiError, cotizarEnvio, crearPreferencia, listarCombos, listarMediosPago, listarProductos } from "@/lib/api";
+import { ApiError, cotizarEnvio, crearPreferencia, listarCombos, listarMediosPago, listarProductos, obtenerJuego, type EstadoJuego } from "@/lib/api";
 import type { CotizacionEnvio, MedioPago, PedidoManual } from "@/lib/api";
 import type { Combo, Producto } from "@/types/producto";
 
@@ -25,6 +25,8 @@ export default function CarritoCheckout() {
   const token = useAuthStore((state) => state.token);
   const sesionVerificada = useAuthStore((state) => state.sesionVerificada);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [juego, setJuego] = useState<EstadoJuego | null>(null);
+  const [usarPremio, setUsarPremio] = useState(false);
   const [catalogoCombos, setCatalogoCombos] = useState<Combo[]>([]);
   const [catalogoListo, setCatalogoListo] = useState(false);
   const [mediosPago, setMediosPago] = useState<MedioPago[]>([]);
@@ -105,7 +107,17 @@ export default function CarritoCheckout() {
   const totalCombos = combosConDatos.reduce((total, combo) => total + combo.precio * combo.cantidad, 0);
   const subtotal = totalProductos + totalCombos;
   const costoEnvio = formaEntrega === "envio" ? (cotizacion?.costo_envio ?? 0) : 0;
-  const total = subtotal + costoEnvio;
+  const premio = juego?.premio?.disponible ? juego.premio : null;
+  const premioAplicable = Boolean(usarPremio && premio && (premio.tipo === "porcentaje" || (formaEntrega === "envio" && costoEnvio > 0)));
+  // Preview only: the server recomputes the discount from the catalogue when the order is created.
+  const descuento = !premioAplicable || !premio ? 0 : premio.tipo === "envio_gratis" ? costoEnvio : Math.round(subtotal * premio.porcentaje / 100);
+  const total = subtotal + costoEnvio - descuento;
+  useEffect(() => {
+    if (!token || !sesionVerificada) return;
+    let vigente = true;
+    obtenerJuego(token).then((estado) => { if (vigente) { setJuego(estado); if (estado.premio?.disponible) setUsarPremio(true); } }).catch(() => {});
+    return () => { vigente = false; };
+  }, [token, sesionVerificada]);
   const carritoVacio = items.length === 0 && combos.length === 0;
   const hayLineasSinCatalogo = itemsConDatos.length !== items.length || combosConDatos.length !== combos.length;
   const cantidadesPorProducto = useMemo(() => {
@@ -217,6 +229,7 @@ export default function CarritoCheckout() {
         email: emailCheckout.trim(),
         medioPago,
         formaEntrega,
+        usarPremio: premioAplicable,
         direccion: direccionEntrega.trim(),
         cotizacion: cotizacion?.cotizacion_envio ?? "",
         usuario: usuario?.id ?? null,
@@ -254,7 +267,8 @@ export default function CarritoCheckout() {
           ...(formaEntrega === "envio"
             ? { direccion: direccionEntrega.trim(), cotizacionEnvio: cotizacion?.cotizacion_envio }
             : {}),
-        }
+        },
+        premioAplicable,
       );
       if (resultado.tipo === "manual") {
         setPedidoManual(resultado);
@@ -382,7 +396,7 @@ export default function CarritoCheckout() {
 
           {!pedidoManual && !carritoVacio && (!token || !usuario || !sesionVerificada ? (
             <aside className="forge-cart-form flex flex-col justify-center gap-4 p-6 sm:p-8" aria-label="Identificación requerida para comprar">
-              <ShieldCheck size={31} className="text-ember" aria-hidden="true" />
+              <UserRound size={31} className="text-ember" aria-hidden="true" />
               <h3 className="font-display text-2xl font-bold uppercase tracking-tight">
                 {token ? "Verificá tu sesión" : "Tu cuenta, primero"}
               </h3>
@@ -556,6 +570,9 @@ export default function CarritoCheckout() {
                 <div className="mb-2 space-y-0.5 text-sm sm:mb-3 sm:space-y-1">
                   <div className="flex items-center justify-between"><span>Productos</span><span>{formatearPrecio(subtotal)}</span></div>
                   <div className="flex items-center justify-between"><span>Envío</span><span>{formaEntrega === "retiro" ? "Gratis" : cotizacion ? formatearPrecio(costoEnvio) : "A calcular"}</span></div>
+                  {premio ? <label className="flex items-start gap-2 py-1 text-sm"><input type="checkbox" checked={usarPremio} onChange={(e) => setUsarPremio(e.target.checked)} className="mt-1 h-4 w-4" /><span>Usar mi premio del juego: <b>{premio.descripcion}</b>{premio.tipo === "envio_gratis" && formaEntrega !== "envio" ? " (se aplica al elegir envío a domicilio)" : ""}</span></label>
+                    : juego?.puede_jugar ? <button type="button" onClick={() => window.dispatchEvent(new Event("ragnar:juego"))} className="py-1 text-left text-sm text-ember underline underline-offset-4">Jugá y ganá hasta 10% de descuento o envío gratis</button> : null}
+                  {descuento > 0 && <div className="flex items-center justify-between text-signal"><span>Premio del juego</span><span>−{formatearPrecio(descuento)}</span></div>}
                   <div className="flex items-center justify-between border-t border-carbon-line pt-1 text-base font-semibold sm:pt-2 sm:text-lg"><span>Total</span><span>{formatearPrecio(total)}</span></div>
                 </div>
                 {error && <p role="alert" className="mb-3 border border-ember/40 bg-ember/10 p-3 text-sm text-ember">{error}</p>}

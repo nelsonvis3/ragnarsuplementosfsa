@@ -127,6 +127,7 @@ REST_FRAMEWORK = {
         "reenviar_confirmacion": "5/hour",
         "confirmar_email": "20/hour",
         "cotizar_envio": "20/hour",
+        "visita": "240/hour",
     },
 }
 

@@ -30,7 +30,7 @@ from .auth_payload import auth_payload, usuario_json
 from .emails import enviar_confirmacion_pedido, enviar_consulta_asesoramiento, instrucciones_pago
 from .email_confirmation import enviar_enlace_confirmacion
 from .order_summary import datos_articulos_pedido, nombre_pedido
-from .models import Categoria, Combo, ItemPedido, Pedido, Producto, SolicitudAtencion, VerificacionEmail
+from .models import Categoria, Combo, ConfiguracionTienda, ItemPedido, Pedido, Premio, Producto, SolicitudAtencion, VerificacionEmail
 from .orders import _cantidades_del_pedido, _notificar_pago_confirmado, expirar_reservas_vencidas, resolver_revision_pago
 from .shipping import (
     ErrorCotizacionEnvio,
@@ -279,6 +279,7 @@ class CheckoutSerializer(serializers.Serializer):
     forma_entrega = serializers.ChoiceField(choices=("retiro", "envio"), default="retiro")
     direccion_entrega = serializers.CharField(required=False, allow_blank=True, max_length=300)
     cotizacion_envio = serializers.CharField(required=False, allow_blank=True)
+    usar_premio = serializers.BooleanField(default=False)
 
     def validate_items(self, items):
         if len(items) > 50:
@@ -332,9 +333,10 @@ def metodos_pago(request):
     if mp_habilitado:
         metodos.append({"id": "mercado_pago", "nombre": "Tarjeta u otros medios con Mercado Pago", "disponible": True})
 
-    alias = os.getenv("PAGO_ALIAS", "")
-    cvu = os.getenv("PAGO_CVU", "")
-    titular = os.getenv("PAGO_TITULAR", "")
+    tienda = ConfiguracionTienda.actual()
+    alias = tienda.valor("pago_alias", "PAGO_ALIAS")
+    cvu = tienda.valor("pago_cvu", "PAGO_CVU")
+    titular = tienda.valor("pago_titular", "PAGO_TITULAR")
     metodos.append({
         "id": "transferencia",
         "nombre": "Transferencia a Personal Pay",
@@ -421,6 +423,90 @@ def respuesta_checkout_existente(pedido, hash_payload):
     })
 
 
+def agregar_items_y_descontar_stock(pedido, items_solicitados):
+    """Crea los ítems del pedido con los precios de la base y descuenta el stock bajo bloqueo.
+
+    Se llama dentro de transaction.atomic(). Lanza Producto/Combo.DoesNotExist o ValidationError.
+    """
+    mp_items = []
+    cantidades_stock = {}
+    total = 0
+    # Orden único de bloqueo: combos por ID, después productos por ID.
+    # Impide interbloqueos si dos carritos ordenan los mismos combos distinto.
+    combos_compra = {c.pk: c for c in Combo.objects.select_for_update().filter(
+        pk__in=[linea["id"] for linea in items_solicitados if linea["tipo"] == "combo"], activo=True
+    ).order_by("id").prefetch_related("productos")}
+    ids_productos = {linea["id"] for linea in items_solicitados if linea["tipo"] == "producto"}
+    for combo_compra in combos_compra.values():
+        ids_productos.update(p.pk for p in combo_compra.productos.all())
+    productos_compra = {p.pk: p for p in Producto.objects.select_for_update().filter(pk__in=ids_productos).order_by("id")}
+    for linea in items_solicitados:
+        componentes_combo = []
+        if linea["tipo"] == "producto":
+            obj = productos_compra.get(linea["id"])
+            if obj is None or not obj.activo:
+                raise Producto.DoesNotExist
+            nombre, precio = obj.nombre, obj.precio
+            producto, combo = obj, None
+            sabor = linea.get("sabor", "").strip()
+            sabores_disponibles = {
+                opcion.get("nombre", "") if isinstance(opcion, dict) else str(opcion)
+                for opcion in obj.sabores
+            }
+            if (sabores_disponibles and sabor not in sabores_disponibles) or (
+                sabor and sabor not in sabores_disponibles
+            ):
+                raise serializers.ValidationError({"detail": f"El sabor elegido para {nombre} ya no está disponible."})
+            cantidades_stock[obj.id] = cantidades_stock.get(obj.id, 0) + linea["cantidad"]
+        else:
+            obj = combos_compra.get(linea["id"])
+            if obj is None:
+                raise Combo.DoesNotExist
+            nombre, precio = obj.nombre, obj.precio
+            producto, combo = None, obj
+            componentes = [productos_compra[p.pk] for p in obj.productos.all()]
+            if any(not componente.activo for componente in componentes):
+                raise serializers.ValidationError({"detail": f"El combo {nombre} tiene productos que ya no están disponibles."})
+            componentes_ids = [componente.pk for componente in componentes]
+            componentes_combo = componentes_ids
+            for producto_id in componentes_ids:
+                cantidades_stock[producto_id] = cantidades_stock.get(producto_id, 0) + linea["cantidad"]
+            if not componentes_ids:
+                raise serializers.ValidationError({"detail": f"El combo {nombre} no tiene productos disponibles."})
+            sabor = ""
+        ItemPedido.objects.create(
+            pedido=pedido,
+            producto=producto,
+            combo=combo,
+            nombre=nombre,
+            sabor=sabor,
+            cantidad=linea["cantidad"],
+            precio_unitario=precio,
+            componentes_combo=componentes_combo,
+        )
+        mp_items.append({
+            "title": nombre + (f" ({sabor})" if sabor else ""),
+            "quantity": linea["cantidad"],
+            "unit_price": float(precio),
+            "currency_id": "ARS",
+        })
+        total += precio * linea["cantidad"]
+    productos_bloqueados = list(
+        Producto.objects.select_for_update().filter(id__in=cantidades_stock).order_by("id")
+    )
+    if len(productos_bloqueados) != len(cantidades_stock):
+        raise serializers.ValidationError({"detail": "Uno de los productos dejó de estar disponible."})
+    for producto_stock in productos_bloqueados:
+        if not producto_stock.activo:
+            raise serializers.ValidationError({"detail": f"{producto_stock.nombre} ya no está disponible."})
+        if producto_stock.stock < cantidades_stock[producto_stock.id]:
+            raise serializers.ValidationError({"detail": f"Stock insuficiente para {producto_stock.nombre}."})
+    for producto_stock in productos_bloqueados:
+        producto_stock.stock -= cantidades_stock[producto_stock.id]
+        producto_stock.save(update_fields=["stock", "actualizado"])
+    return total, mp_items
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def crear_preferencia(request):
@@ -463,13 +549,11 @@ def crear_preferencia(request):
     mp_habilitado = os.getenv("MP_ENABLED", "false").strip().lower() == "true" and bool(token) and not token.startswith("TU_")
     if medio_pago == "mercado_pago" and not mp_habilitado:
         return Response({"detail": "Mercado Pago no está habilitado en este momento. Elegí transferencia o pago en el local."}, status=503)
-    if medio_pago == "transferencia" and not (os.getenv("PAGO_ALIAS") or os.getenv("PAGO_CVU")):
+    tienda = ConfiguracionTienda.actual()
+    if medio_pago == "transferencia" and not (tienda.valor("pago_alias", "PAGO_ALIAS") or tienda.valor("pago_cvu", "PAGO_CVU")):
         return Response({"detail": "La transferencia a Personal Pay todavía no está configurada."}, status=503)
 
     items_solicitados = serializer.validated_data["items"]
-    mp_items = []
-    cantidades_stock = {}
-    total = 0
     pedido = None
 
     try:
@@ -488,81 +572,8 @@ def crear_preferencia(request):
                 checkout_key=checkout_key,
                 checkout_payload_hash=hash_payload,
             )
-            # Orden único de bloqueo: combos por ID, después productos por ID.
-            # Impide interbloqueos si dos carritos ordenan los mismos combos distinto.
-            combos_compra = {c.pk: c for c in Combo.objects.select_for_update().filter(
-                pk__in=[linea["id"] for linea in items_solicitados if linea["tipo"] == "combo"], activo=True
-            ).order_by("id").prefetch_related("productos")}
-            ids_productos = {linea["id"] for linea in items_solicitados if linea["tipo"] == "producto"}
-            for combo_compra in combos_compra.values():
-                ids_productos.update(p.pk for p in combo_compra.productos.all())
-            productos_compra = {p.pk: p for p in Producto.objects.select_for_update().filter(pk__in=ids_productos).order_by("id")}
-            for linea in items_solicitados:
-                componentes_combo = []
-                if linea["tipo"] == "producto":
-                    obj = productos_compra.get(linea["id"])
-                    if obj is None or not obj.activo:
-                        raise Producto.DoesNotExist
-                    nombre, precio = obj.nombre, obj.precio
-                    producto, combo = obj, None
-                    sabor = linea.get("sabor", "").strip()
-                    sabores_disponibles = {
-                        opcion.get("nombre", "") if isinstance(opcion, dict) else str(opcion)
-                        for opcion in obj.sabores
-                    }
-                    if (sabores_disponibles and sabor not in sabores_disponibles) or (
-                        sabor and sabor not in sabores_disponibles
-                    ):
-                        raise serializers.ValidationError({"detail": f"El sabor elegido para {nombre} ya no está disponible."})
-                    cantidades_stock[obj.id] = cantidades_stock.get(obj.id, 0) + linea["cantidad"]
-                else:
-                    obj = combos_compra.get(linea["id"])
-                    if obj is None:
-                        raise Combo.DoesNotExist
-                    nombre, precio = obj.nombre, obj.precio
-                    producto, combo = None, obj
-                    componentes = [productos_compra[p.pk] for p in obj.productos.all()]
-                    if any(not componente.activo for componente in componentes):
-                        raise serializers.ValidationError({"detail": f"El combo {nombre} tiene productos que ya no están disponibles."})
-                    componentes_ids = [componente.pk for componente in componentes]
-                    componentes_combo = componentes_ids
-                    for producto_id in componentes_ids:
-                        cantidades_stock[producto_id] = cantidades_stock.get(producto_id, 0) + linea["cantidad"]
-                    if not componentes_ids:
-                        raise serializers.ValidationError({"detail": f"El combo {nombre} no tiene productos disponibles."})
-                    sabor = ""
-                ItemPedido.objects.create(
-                    pedido=pedido,
-                    producto=producto,
-                    combo=combo,
-                    nombre=nombre,
-                    sabor=sabor,
-                    cantidad=linea["cantidad"],
-                    precio_unitario=precio,
-                    componentes_combo=componentes_combo,
-                )
-                mp_items.append({
-                    "title": nombre + (f" ({sabor})" if sabor else ""),
-                    "quantity": linea["cantidad"],
-                    "unit_price": float(precio),
-                    "currency_id": "ARS",
-                })
-                total += precio * linea["cantidad"]
-            productos_bloqueados = list(
-                Producto.objects.select_for_update().filter(id__in=cantidades_stock).order_by("id")
-            )
-            if len(productos_bloqueados) != len(cantidades_stock):
-                raise serializers.ValidationError({"detail": "Uno de los productos dejó de estar disponible."})
-            for producto_stock in productos_bloqueados:
-                if not producto_stock.activo:
-                    raise serializers.ValidationError({"detail": f"{producto_stock.nombre} ya no está disponible."})
-                if producto_stock.stock < cantidades_stock[producto_stock.id]:
-                    raise serializers.ValidationError({"detail": f"Stock insuficiente para {producto_stock.nombre}."})
+            total, mp_items = agregar_items_y_descontar_stock(pedido, items_solicitados)
             reservar_stock = True
-            if reservar_stock:
-                for producto_stock in productos_bloqueados:
-                    producto_stock.stock -= cantidades_stock[producto_stock.id]
-                    producto_stock.save(update_fields=["stock", "actualizado"])
             if costo_envio:
                 mp_items.append({
                     "title": f"Envío a domicilio ({distancia_envio} km)",
@@ -570,7 +581,25 @@ def crear_preferencia(request):
                     "unit_price": float(costo_envio),
                     "currency_id": "ARS",
                 })
-            pedido.total = total + costo_envio
+            descuento = Decimal("0")
+            if serializer.validated_data["usar_premio"]:
+                ahora = timezone.now()
+                premio = next((p for p in Premio.objects.select_for_update().select_related("pedido").filter(usuario=request.user).order_by("vence") if p.disponible(ahora)), None)
+                if not premio:
+                    raise serializers.ValidationError({"detail": "Tu premio ya se usó o venció. Confirmá la compra sin el premio."})
+                if premio.tipo == "envio_gratis":
+                    if not costo_envio:
+                        raise serializers.ValidationError({"detail": "El envío gratis se aplica solo a envíos a domicilio."})
+                    descuento = Decimal(costo_envio)
+                else:
+                    descuento = (Decimal(total) * premio.porcentaje / 100).quantize(Decimal("1"))
+                premio.pedido = pedido
+                premio.save(update_fields=["pedido"])
+                # Mercado Pago rejects negative lines: charge the discounted order as one line.
+                mp_items = [{"title": f"Pedido Ragnar #{pedido.pk} ({premio.descripcion})", "quantity": 1,
+                             "unit_price": float(total + costo_envio - descuento), "currency_id": "ARS"}]
+            pedido.descuento = descuento
+            pedido.total = total + costo_envio - descuento
             if pedido.total > Decimal("9999999999.99"):
                 raise serializers.ValidationError({"detail": "El total del pedido supera el máximo admitido. Reducí las cantidades o contactanos."})
             pedido.stock_reservado = reservar_stock
@@ -578,7 +607,7 @@ def crear_preferencia(request):
                 pedido.stock_reservado_hasta = timezone.now() + timedelta(
                     minutes=settings.PEDIDO_RESERVA_MINUTOS
                 )
-            pedido.save(update_fields=["total", "stock_reservado", "stock_reservado_hasta"])
+            pedido.save(update_fields=["total", "descuento", "stock_reservado", "stock_reservado_hasta"])
     except (Producto.DoesNotExist, Combo.DoesNotExist):
         return Response({"detail": "Uno de los productos o combos ya no está disponible."}, status=400)
     except serializers.ValidationError as exc:

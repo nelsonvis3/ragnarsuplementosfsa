@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Check, Minus, Plus } from "lucide-react";
 import { Producto } from "@/types/producto";
 import { useCartStore } from "@/store/cart-store";
+import { categoria } from "@/components/ProductoCard";
 
 function formatearPrecio(valor: number) {
   return `$${valor.toLocaleString("es-AR")}`;
@@ -64,12 +65,12 @@ export default function ProductPurchaseBox({
   return (
     <div className="forge-product-detail grid gap-10 lg:grid-cols-2">
       {/* Galería de imagen */}
-      <div className="forge-product-visual relative aspect-square border border-carbon-line bg-carbon-raised">
+      <div className="forge-product-visual relative aspect-[4/5] border border-carbon-line bg-carbon-raised">
         <Image
           src={imagenActual}
           alt={producto.nombre}
           fill
-          className="object-contain p-12"
+          className="object-cover"
           sizes="(min-width: 1024px) 50vw, 100vw"
           priority
         />
@@ -78,7 +79,7 @@ export default function ProductPurchaseBox({
       {/* Info y compra */}
       <div className="forge-product-info lg:py-7">
         <span className="forge-eyebrow">
-          {producto.categoria.replace("-", " ")}
+          {categoria(producto.categoria)}
         </span>
 
         <h1 className="mt-5 font-display text-4xl font-bold sm:text-5xl">

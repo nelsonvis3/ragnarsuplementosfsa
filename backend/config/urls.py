@@ -5,6 +5,8 @@ from rest_framework.routers import SimpleRouter
 from store import views
 from store.catalog_admin import CategoriaAdminViewSet, ComboAdminViewSet, ProductoAdminViewSet
 from store.order_admin import PedidoAdminViewSet
+from store.panel import SolicitudAdminViewSet, clientes, configuracion_tienda, registrar_visita, resumen, venta_mostrador
+from store.juego import configuracion_juego, estado_juego, jugar
 from store.password_reset import recuperar_contrasena, restablecer_contrasena
 from store.email_confirmation import confirmar_email, reenviar_confirmacion
 
@@ -13,10 +15,19 @@ catalogo_router.register("productos", ProductoAdminViewSet, basename="administra
 catalogo_router.register("combos", ComboAdminViewSet, basename="administracion-combos")
 catalogo_router.register("categorias", CategoriaAdminViewSet, basename="administracion-categorias")
 catalogo_router.register("pedidos", PedidoAdminViewSet, basename="administracion-pedidos")
+catalogo_router.register("solicitudes", SolicitudAdminViewSet, basename="administracion-solicitudes")
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("administracion/resumen/", resumen),
+    path("administracion/juego/", configuracion_juego),
+    path("administracion/tienda/", configuracion_tienda),
+    path("administracion/clientes/", clientes),
+    path("administracion/ventas-mostrador/", venta_mostrador),
+    path("juego", estado_juego),
+    path("juego/jugar", jugar),
     path("administracion/", include(catalogo_router.urls)),
+    path("analitica/visita", registrar_visita),
     path("health/", views.health),
     path("auth/registro", views.registro),
     path("auth/login", views.login),

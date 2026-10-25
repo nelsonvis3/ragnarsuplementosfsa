@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X, ShoppingCart, User, LogOut, Settings } from "lucide-react";
+import { Menu, X, ShoppingCart, User, LogOut, Settings, Truck, Store, Banknote } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import { useAuthStore } from "@/store/auth-store";
 import CartDrawer from "@/components/CarritoDrawer";
@@ -39,7 +39,9 @@ export default function Navbar() {
     <>
       {pathname === "/" && !carritoAbierto && (
         <div className="forge-announce" aria-label="Información de entrega">
-          <b>RAGNAR SUPLEMENTOS</b><span>·</span> ENVÍOS EN FORMOSA CAPITAL <span>·</span> RETIRO EN LOCAL
+          <b className="inline-flex items-center gap-1.5"><Truck size={14} aria-hidden="true" />ENVÍOS EN FORMOSA CAPITAL</b><span>·</span>
+          <span className="inline-flex items-center gap-1.5"><Store size={14} aria-hidden="true" />RETIRO EN AZCUÉNAGA 991</span><span>·</span>
+          <span className="inline-flex items-center gap-1.5"><Banknote size={14} aria-hidden="true" />PAGÁS POR TRANSFERENCIA O EN EFECTIVO</span>
         </div>
       )}
       <header className="forge-header sticky top-0 z-50">

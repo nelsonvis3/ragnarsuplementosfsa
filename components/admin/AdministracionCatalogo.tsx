@@ -3,9 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ArrowUpRight, Boxes, Eye, EyeOff, LockKeyhole, Package, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { ArrowUpRight, Boxes, Eye, EyeOff, Gift, LayoutDashboard, LockKeyhole, MessageSquare, Package, Pencil, Plus, RefreshCw, Search, ShoppingBag, Store, Trash2, Users, Banknote } from "lucide-react";
 import {
-  ApiError, crearCategoria, eliminarArticuloAdministracion, guardarArticuloAdministracion, iniciarSesion,
+  ApiError, crearCategoria, eliminarArticuloAdministracion, eliminarCategoria, renombrarCategoria, guardarArticuloAdministracion, iniciarSesion,
   listarCatalogoAdministracion, obtenerPerfil,
   type ArticuloAdministracion, type ImagenSaborUpload, type RecursoAdministracion, type Usuario,
 } from "@/lib/api";
@@ -13,6 +13,12 @@ import { useAuthStore } from "@/store/auth-store";
 import CategoriasPanel from "@/components/admin/CategoriasPanel";
 import ArticuloForm from "@/components/admin/ArticuloForm";
 import PedidosPanel from "@/components/admin/PedidosPanel";
+import ResumenPanel from "@/components/admin/ResumenPanel";
+import AtencionPanel from "@/components/admin/AtencionPanel";
+import JuegoPanel from "@/components/admin/JuegoPanel";
+import VentaMostradorPanel from "@/components/admin/VentaMostradorPanel";
+import ClientesPanel from "@/components/admin/ClientesPanel";
+import TiendaPanel from "@/components/admin/TiendaPanel";
 
 type Catalogo = Awaited<ReturnType<typeof listarCatalogoAdministracion>>;
 type Editor = { articulo: ArticuloAdministracion | null; recurso: RecursoAdministracion };
@@ -172,7 +178,13 @@ function CatalogoPanel({ token }: { token: string }) {
 
   return (
     <>
-      <CategoriasPanel categorias={catalogo.categorias} onCrear={async (nombre) => { const categoria = await crearCategoria(token, nombre); setCatalogo((actual) => actual ? { ...actual, categorias: [...actual.categorias, categoria] } : actual); }} />
+      <CategoriasPanel
+        categorias={catalogo.categorias}
+        productosPorCategoria={catalogo.productos.reduce<Record<string, number>>((cuenta, p) => ({ ...cuenta, [p.categoria]: (cuenta[p.categoria] ?? 0) + 1 }), {})}
+        onCrear={async (nombre) => { const categoria = await crearCategoria(token, nombre); setCatalogo((actual) => actual ? { ...actual, categorias: [...actual.categorias, categoria] } : actual); }}
+        onRenombrar={async (id, nombre) => { const categoria = await renombrarCategoria(token, id, nombre); setCatalogo((actual) => actual ? { ...actual, categorias: actual.categorias.map((c) => c.id === id ? categoria : c) } : actual); }}
+        onEliminar={async (id) => { await eliminarCategoria(token, id); setCatalogo((actual) => actual ? { ...actual, categorias: actual.categorias.filter((c) => c.id !== id) } : actual); }}
+      />
       <div className="mt-8 grid gap-3 sm:grid-cols-3">
         {[{ nombre: "Productos publicados", valor: catalogo.productos.filter((p) => p.activo).length, Icono: Package }, { nombre: "Productos sin stock", valor: catalogo.productos.filter((p) => p.activo && p.stock === 0).length, Icono: Boxes }, { nombre: "Combos publicados", valor: catalogo.combos.filter((c) => c.activo).length, Icono: Eye }].map(({ nombre, valor, Icono }) => <div key={nombre} className="flex items-center justify-between gap-4 border border-carbon-line bg-carbon-raised p-5"><div><p className="text-xs text-bone-dim">{nombre}</p><p className="mt-2 font-display text-3xl font-semibold">{valor}</p></div><Icono size={22} className="text-ember" /></div>)}
       </div>
@@ -197,7 +209,7 @@ function CatalogoPanel({ token }: { token: string }) {
           {filtrados.map((a) => {
             const comboIncompleto = "productos" in a && (a.productos.length === 0 || a.productos.some((id) => !catalogo.productos.find((p) => p.id === id)?.activo));
             return <li key={a.id} className="grid min-w-0 gap-4 border-b border-carbon-line p-4 last:border-b-0 sm:p-5 lg:grid-cols-[minmax(0,1fr)_110px_80px_100px_140px] lg:items-center">
-              <div className="flex min-w-0 items-center gap-3"><div className="relative h-16 w-16 shrink-0 border border-carbon-line bg-carbon"><Image src={a.imagen} alt="" fill className="object-contain p-2" sizes="64px" /></div><div className="min-w-0"><h3 className="break-words text-sm font-medium">{a.nombre}</h3><p className="mt-1 text-xs capitalize text-bone-dim">{"categoria" in a ? a.categoria.replaceAll("-", " ") : `Combo · ${a.productos.length} productos`}</p>{comboIncompleto && <p className="mt-1 text-xs text-ember">Hay componentes despublicados. El combo no está disponible en la tienda.</p>}</div></div>
+              <div className="flex min-w-0 items-center gap-3"><div className="relative h-16 w-16 shrink-0 border border-carbon-line bg-carbon"><Image src={a.imagen} alt="" fill className="object-contain p-2" sizes="64px" /></div><div className="min-w-0"><h3 className="break-words text-sm font-medium">{a.nombre}</h3><p className="mt-1 text-xs capitalize text-bone-dim">{"categoria" in a ? catalogo.categorias.find((c) => c.slug === a.categoria)?.nombre ?? a.categoria.replaceAll("-", " ") : `Combo · ${a.productos.length} productos`}</p>{comboIncompleto && <p className="mt-1 text-xs text-ember">Hay componentes despublicados. El combo no está disponible en la tienda.</p>}</div></div>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm lg:contents"><span><span className="mr-1 text-xs text-bone-dim lg:hidden">Precio:</span>${a.precio.toLocaleString("es-AR")}</span><span className={a.stock === 0 ? "text-ember" : "text-bone-dim"}><span className="mr-1 text-xs lg:hidden">Stock:</span>{a.stock}</span><span className={`w-fit border px-2 py-1 text-xs ${a.activo ? "border-signal/40 text-bone" : "border-carbon-line text-bone-dim"}`}>{a.activo ? "Publicado" : "Despublicado"}</span></div>
               <div className="flex items-center gap-1 lg:justify-end"><button disabled={ocupado} onClick={() => abrirEditor(a)} aria-label={`Editar ${a.nombre}`} title="Editar" className="p-2.5 text-bone-dim hover:bg-carbon hover:text-ember disabled:opacity-40"><Pencil size={17} /></button><button disabled={ocupado} onClick={() => { setEliminando(null); void cambiarPublicacion(a); }} aria-label={`${a.activo ? "Despublicar" : "Publicar"} ${a.nombre}`} title={a.activo ? "Despublicar" : "Publicar"} className="p-2.5 text-bone-dim hover:bg-carbon hover:text-ember disabled:opacity-40">{a.activo ? <EyeOff size={17} /> : <Eye size={17} />}</button><button disabled={ocupado} onClick={() => { setEliminando(a); setError(null); setMensaje(null); }} aria-label={`Eliminar ${a.nombre}`} title="Eliminar" className="p-2.5 text-bone-dim hover:bg-carbon hover:text-ember disabled:opacity-40"><Trash2 size={17} /></button>{a.activo && !comboIncompleto && <Link href={`/${recurso}/${a.slug}`} target="_blank" rel="noopener noreferrer" aria-label={`Ver ${a.nombre} en la tienda`} title="Ver en la tienda" className="p-2.5 text-bone-dim hover:bg-carbon hover:text-ember"><ArrowUpRight size={17} /></Link>}</div>
             </li>;
@@ -210,14 +222,31 @@ function CatalogoPanel({ token }: { token: string }) {
   );
 }
 
+const secciones = [
+  { id: "resumen", nombre: "Resumen", Icono: LayoutDashboard },
+  { id: "pedidos", nombre: "Pedidos", Icono: ShoppingBag },
+  { id: "mostrador", nombre: "Venta en mostrador", Icono: Store },
+  { id: "catalogo", nombre: "Catálogo", Icono: Package },
+  { id: "clientes", nombre: "Clientes", Icono: Users },
+  { id: "atencion", nombre: "Atención", Icono: MessageSquare },
+  { id: "juego", nombre: "Juego", Icono: Gift },
+  { id: "tienda", nombre: "Pagos y envíos", Icono: Banknote },
+] as const;
+type Seccion = (typeof secciones)[number]["id"];
+
 function PanelTienda({ token }: { token: string }) {
-  const [seccion, setSeccion] = useState<"catalogo" | "pedidos">("catalogo");
-  return <>
-    <div className="mt-8 flex gap-3 border-b border-carbon-line pb-4" role="group" aria-label="Sección de administración">
-      {(["catalogo", "pedidos"] as const).map((valor) => <button key={valor} type="button" aria-pressed={seccion === valor} onClick={() => setSeccion(valor)} className={`rounded-lg border px-5 py-3 text-sm font-semibold ${seccion === valor ? "border-ember bg-ember text-white" : "border-carbon-line text-bone-dim hover:text-bone"}`}>{valor === "catalogo" ? "Catálogo" : "Pedidos"}</button>)}
+  const [seccion, setSeccion] = useState<Seccion>("resumen");
+  function irA(valor: Seccion) { setSeccion(valor); window.scrollTo({ top: 0, behavior: "instant" }); }
+  return <div className="mt-8 grid items-start gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
+    <nav aria-label="Secciones del panel" className="-mx-5 overflow-x-auto [scrollbar-width:none] border-y border-carbon-line bg-carbon-raised px-5 lg:sticky lg:top-24 lg:mx-0 lg:rounded-xl lg:border lg:p-2">
+      <ul className="flex gap-1 py-2 lg:flex-col lg:py-0">
+        {secciones.map(({ id, nombre, Icono }) => <li key={id}><button type="button" aria-current={seccion === id ? "page" : undefined} onClick={() => irA(id)} className={`flex w-full items-center gap-3 whitespace-nowrap rounded-md px-3 py-2.5 text-sm font-medium ${seccion === id ? "bg-ember text-white" : "text-bone-dim hover:bg-carbon hover:text-bone"}`}><Icono size={17} />{nombre}</button></li>)}
+      </ul>
+    </nav>
+    <div className="min-w-0">
+      {seccion === "resumen" ? <ResumenPanel token={token} irA={irA} /> : seccion === "pedidos" ? <PedidosPanel token={token} /> : seccion === "catalogo" ? <CatalogoPanel token={token} /> : seccion === "atencion" ? <AtencionPanel token={token} /> : seccion === "mostrador" ? <VentaMostradorPanel token={token} /> : seccion === "clientes" ? <ClientesPanel token={token} /> : seccion === "tienda" ? <TiendaPanel token={token} /> : <JuegoPanel token={token} />}
     </div>
-    {seccion === "catalogo" ? <CatalogoPanel token={token} /> : <PedidosPanel token={token} />}
-  </>;
+  </div>;
 }
 
 export default function AdministracionCatalogo() {
@@ -248,7 +277,7 @@ export default function AdministracionCatalogo() {
 
   return (
     <main className="flex-1">
-      <div className="mx-auto max-w-6xl px-5 py-10 sm:py-14">
+      <div className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
         <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-medium uppercase tracking-widest text-ember">Ragnar / Administración</p><h1 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">Tu tienda, en orden.</h1><p className="mt-3 text-sm leading-6 text-bone-dim">Gestioná el catálogo, el stock y los pedidos desde un solo lugar.</p></div><Link href="/productos" className="flex items-center gap-2 text-sm text-bone-dim hover:text-ember">Ir a la tienda <ArrowUpRight size={17} /></Link></div>
         {!token ? <AccesoAdministracion /> : error?.token === token ? <div className="mt-10"><p role="alert" className="text-ember">{error.mensaje}</p><button onClick={() => setRevision((r) => r + 1)} className="mt-4 border border-carbon-line px-4 py-2 text-sm">Reintentar</button></div> : perfil?.token !== token || !sesionVerificada ? <p role="status" className="mt-10 text-bone-dim">Verificando acceso…</p> : !usuario?.puede_administrar_catalogo ? <div className="mt-10 border border-carbon-line bg-carbon-raised p-6"><h2 className="font-display text-xl">Tu cuenta no tiene acceso administrativo.</h2><p className="mt-2 text-sm text-bone-dim">Ingresá con la cuenta que gestiona el catálogo de Ragnar.</p><button onClick={cerrarSesion} className="mt-5 border border-ember px-4 py-2 text-sm text-ember">Ingresar con otra cuenta</button></div> : <PanelTienda key={token} token={token} />}
       </div>

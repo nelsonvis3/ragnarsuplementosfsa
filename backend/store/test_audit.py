@@ -61,6 +61,23 @@ class AuditoriaTests(APITestCase):
             self.assertEqual(self.client.post("/administracion/categorias/", {"nombre": nombre}, format="json").status_code, 400, nombre)
         self.assertEqual(self.client.patch(f"/administracion/productos/{self.productos[0].pk}/", {"categoria": "inexistente"}, format="json").status_code, 400)
 
+    def test_renombrar_categoria_conserva_slug_y_solo_se_borra_vacia(self):
+        self.client.force_authenticate(self.admin)
+        creatinas = Categoria.objects.create(nombre="creatinas", slug="creatinas")
+        Categoria.objects.create(nombre="Vitaminas", slug="vitaminas")
+        respuesta = self.client.patch(f"/administracion/categorias/{creatinas.pk}/", {"nombre": "Creatinas"}, format="json")
+        self.assertEqual(respuesta.status_code, 200, respuesta.data)
+        self.assertEqual((respuesta.data["nombre"], respuesta.data["slug"]), ("Creatinas", "creatinas"))
+        self.assertEqual(self.client.patch(f"/administracion/categorias/{creatinas.pk}/", {"nombre": "vitaminas"}, format="json").status_code, 400)
+        # Tiene productos (los del setUp usan el slug "creatinas"): no se borra.
+        self.assertEqual(self.client.delete(f"/administracion/categorias/{creatinas.pk}/").status_code, 409)
+        portada = Categoria.objects.create(nombre="proteinas", slug="proteinas")
+        self.assertEqual(self.client.delete(f"/administracion/categorias/{portada.pk}/").status_code, 409)
+        vacia = Categoria.objects.create(nombre="Sin uso", slug="sin-uso")
+        self.assertEqual(self.client.delete(f"/administracion/categorias/{vacia.pk}/").status_code, 204)
+        self.client.force_authenticate(self.cliente)
+        self.assertEqual(self.client.patch(f"/administracion/categorias/{creatinas.pk}/", {"nombre": "X"}, format="json").status_code, 403)
+
     def test_destacados_suman_unidades_y_excluyen_estados_no_confirmados(self):
         self.pedido(producto=self.productos[1], cantidad=2)
         self.pedido(producto=self.productos[1], cantidad=3)

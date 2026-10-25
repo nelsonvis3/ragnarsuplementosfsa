@@ -271,10 +271,12 @@ class CategoriaAdminSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "slug")
 
     def validate_nombre(self, value):
+        value = value.strip()
         slug = slugify(value)[:80]
         if not slug or slug in {"todos", "combos"}:
             raise serializers.ValidationError("Elegí un nombre de categoría distinto de Todos o Combos.")
-        if Categoria.objects.filter(slug=slug).exists() or Categoria.objects.filter(nombre__iexact=value).exists():
+        otras = Categoria.objects.exclude(pk=self.instance.pk) if self.instance else Categoria.objects.all()
+        if otras.filter(slug=slug).exists() or otras.filter(nombre__iexact=value).exists():
             raise serializers.ValidationError("Ya existe una categoría con ese nombre.")
         return value
 
@@ -287,7 +289,23 @@ class CategoriaAdminSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"nombre": "Ya existe una categoría con ese nombre."})
 
 
+# Los enlaces de "Según tu objetivo" en la portada apuntan a estos slugs.
+CATEGORIAS_DE_PORTADA = {"proteinas", "creatina", "pre-entreno", "mass"}
+
+
 class CategoriaAdminViewSet(CatalogoAdminViewSet):
+    """Renombrar cambia solo el nombre visible: el slug queda fijo porque Producto.categoria lo guarda como texto."""
     queryset = Categoria.objects.all()
     serializer_class = CategoriaAdminSerializer
-    http_method_names = ("get", "post", "head", "options")
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        productos = Producto.objects.filter(categoria=instance.slug).count()
+        if productos:
+            raise ConflictoCatalogo(f"Esta categoría tiene {productos} producto(s). Pasalos a otra categoría antes de eliminarla.")
+        if instance.slug in CATEGORIAS_DE_PORTADA:
+            raise ConflictoCatalogo("La portada enlaza esta categoría en «Según tu objetivo». Renombrala en lugar de eliminarla.")
+        self._registrar(instance, DELETION, "Eliminada desde el panel de la tienda.")
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

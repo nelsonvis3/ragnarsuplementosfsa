@@ -8,11 +8,13 @@ from rest_framework.response import Response
 
 from .models import Pedido
 from .order_summary import datos_articulos_pedido, nombre_pedido
-from .orders import completar_pedido_mercado_pago, expirar_reservas_vencidas, procesar_pedido_manual, resolver_revision_pago
+from .orders import anular_venta_mostrador, completar_pedido_mercado_pago, expirar_reservas_vencidas, procesar_pedido_manual, resolver_revision_pago
 from .permissions import AdministradorCatalogo
 
 
 def acciones_pedido(pedido):
+    if pedido.canal == "mostrador":
+        return ["anular_mostrador"] if pedido.estado == "aprobado" else []
     if pedido.proveedor_pago in ("local", "transferencia") and pedido.estado in ("pendiente", "revisar_stock"):
         return ["aprobar", "cancelar"]
     if pedido.proveedor_pago == "mercado_pago":
@@ -38,12 +40,13 @@ class PedidoAdminSerializer(serializers.ModelSerializer):
     acciones = serializers.SerializerMethodField()
     total = serializers.DecimalField(max_digits=12, decimal_places=2, coerce_to_string=False)
     costo_envio = serializers.DecimalField(max_digits=12, decimal_places=2, coerce_to_string=False)
+    descuento = serializers.DecimalField(max_digits=12, decimal_places=2, coerce_to_string=False)
 
     class Meta:
         model = Pedido
         fields = ("id", "nombre_pedido", "items", "nombre_comprador", "email_comprador", "telefono_comprador",
                   "estado", "estado_nombre", "proveedor_pago", "medio_pago_nombre", "forma_entrega", "entrega_nombre",
-                  "direccion_entrega", "total", "costo_envio", "stock_reservado", "stock_reservado_hasta",
+                  "direccion_entrega", "total", "costo_envio", "descuento", "stock_reservado", "stock_reservado_hasta", "canal",
                   "pago_id", "pagos_adicionales", "creado", "actualizado", "acciones")
 
     def get_nombre_pedido(self, obj):
@@ -62,7 +65,7 @@ class FiltrosPedidos(serializers.Serializer):
 
 
 class AccionPedidoSerializer(serializers.Serializer):
-    accion = serializers.ChoiceField(choices=("aprobar", "cancelar", "completar_stock", "consultar_pago", "cerrar_sin_pago", "cerrar_reembolsado"))
+    accion = serializers.ChoiceField(choices=("aprobar", "cancelar", "completar_stock", "consultar_pago", "cerrar_sin_pago", "cerrar_reembolsado", "anular_mostrador"))
     actualizado = serializers.DateTimeField()
     verificado_proveedor = serializers.BooleanField(default=False)
 
@@ -128,6 +131,8 @@ class PedidoAdminViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({"detail": "Confirmá que verificaste el estado y, si corresponde, la devolución en Mercado Pago."}, status=400)
             if accion in ("aprobar", "cancelar"):
                 ok, mensaje = procesar_pedido_manual(pedido.pk, accion)
+            elif accion == "anular_mostrador":
+                ok, mensaje = anular_venta_mostrador(pedido.pk)
             elif accion == "completar_stock":
                 ok, mensaje = completar_pedido_mercado_pago(pedido.pk)
             elif accion == "consultar_pago":

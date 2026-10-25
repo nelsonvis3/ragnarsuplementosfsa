@@ -189,3 +189,23 @@ def resolver_revision_pago(pedido_id, estado_final):
         pedido.stock_reservado_hasta = None
         pedido.save(update_fields=["estado", "stock_reservado", "stock_reservado_hasta", "actualizado"])
     return True, f"Revisión cerrada como {pedido.get_estado_display().lower()}."
+
+
+def anular_venta_mostrador(pedido_id):
+    """Anula una venta de mostrador cargada por error y devuelve las unidades al inventario."""
+    with transaction.atomic():
+        pedido = Pedido.objects.select_for_update().filter(pk=pedido_id, canal="mostrador").first()
+        if not pedido:
+            return False, "La venta no existe."
+        if pedido.estado != "aprobado":
+            return False, f"La venta ya está {pedido.get_estado_display().lower()}."
+        cantidades = _cantidades_del_pedido(pedido)
+        productos = list(Producto.objects.select_for_update().filter(pk__in=cantidades).order_by("id"))
+        if len(productos) != len(cantidades):
+            return False, "Falta un producto asociado a la venta; revisala manualmente."
+        for producto in productos:
+            producto.stock += cantidades[producto.id]
+            producto.save(update_fields=["stock", "actualizado"])
+        pedido.estado = "cancelado"
+        pedido.save(update_fields=["estado", "actualizado"])
+    return True, "Venta anulada. Las unidades volvieron al stock."

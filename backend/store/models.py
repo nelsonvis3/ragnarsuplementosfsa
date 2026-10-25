@@ -1,3 +1,4 @@
+import os
 import uuid
 
 from django.conf import settings
@@ -121,6 +122,9 @@ class Pedido(models.Model):
     direccion_entrega = models.CharField(max_length=300, blank=True)
     distancia_envio_km = models.DecimalField(max_digits=7, decimal_places=1, null=True, blank=True)
     costo_envio = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    descuento = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    CANALES = [("web", "Tienda online"), ("mostrador", "Venta en mostrador")]
+    canal = models.CharField(max_length=10, choices=CANALES, default="web", db_index=True)
     preferencia_id = models.CharField(max_length=120, blank=True)
     preferencia_url = models.URLField(max_length=1000, blank=True)
     checkout_key = models.UUIDField(unique=True, null=True, blank=True, editable=False)
@@ -178,3 +182,73 @@ class ItemPedido(models.Model):
 
     def __str__(self):
         return f"{self.cantidad} x {self.nombre}"
+
+
+class VisitaDia(models.Model):
+    """Page views per day and path. Aggregated, no personal data."""
+    dia = models.DateField(db_index=True)
+    ruta = models.CharField(max_length=200)
+    vistas = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["dia", "ruta"], name="visita_unica_por_dia_y_ruta")]
+
+
+class VisitanteDia(models.Model):
+    """One row per visitor and day. The digest rotates daily and never stores the IP."""
+    dia = models.DateField(db_index=True)
+    huella = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["dia", "huella"], name="visitante_unico_por_dia")]
+
+
+class ConfiguracionJuego(models.Model):
+    """Single row. Prize weights are relative (70/25/5 means 70%, 25%, 5%)."""
+    activo = models.BooleanField(default=True)
+    peso_5 = models.PositiveSmallIntegerField(default=70)
+    peso_10 = models.PositiveSmallIntegerField(default=25)
+    peso_envio = models.PositiveSmallIntegerField(default=5)
+    dias_validez = models.PositiveSmallIntegerField(default=7)
+
+    @classmethod
+    def actual(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+
+class Premio(models.Model):
+    """A card-game prize. Free again if its order ends canceled or rejected."""
+    TIPOS = [("porcentaje", "Descuento"), ("envio_gratis", "Envío gratis")]
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="premios_juego")
+    tipo = models.CharField(max_length=12, choices=TIPOS)
+    porcentaje = models.PositiveSmallIntegerField(default=0)
+    creado = models.DateTimeField(auto_now_add=True)
+    vence = models.DateTimeField()
+    pedido = models.ForeignKey("Pedido", null=True, blank=True, on_delete=models.SET_NULL, related_name="premios")
+
+    @property
+    def descripcion(self):
+        return "Envío gratis" if self.tipo == "envio_gratis" else f"{self.porcentaje}% de descuento"
+
+    def disponible(self, ahora):
+        return self.vence > ahora and (self.pedido is None or self.pedido.estado in ("cancelado", "rechazado"))
+
+
+class ConfiguracionTienda(models.Model):
+    """Datos que el dueño edita desde el panel. Un campo vacío usa la variable de entorno equivalente."""
+    pago_titular = models.CharField(max_length=150, blank=True)
+    pago_alias = models.CharField(max_length=60, blank=True)
+    pago_cvu = models.CharField(max_length=30, blank=True)
+    envio_tarifas = models.CharField(max_length=300, blank=True, help_text="Hasta cuántos km y precio: 1:0,3:1000,5:2500")
+    instrucciones_local = models.TextField(max_length=500, blank=True)
+    instrucciones_efectivo_envio = models.TextField(max_length=500, blank=True)
+
+    class Meta:
+        verbose_name = "configuración de la tienda"
+
+    @classmethod
+    def actual(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+    def valor(self, campo, variable, defecto=""):
+        return getattr(self, campo).strip() or os.getenv(variable, defecto)

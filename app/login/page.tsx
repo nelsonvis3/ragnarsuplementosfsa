@@ -3,7 +3,7 @@
 import { Suspense, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Gift, LockKeyhole, Mail, Store } from "lucide-react";
 import { registrarUsuario, iniciarSesion, ApiError, type RegistroResponse } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import Logo from "@/components/Logo";
@@ -85,11 +85,11 @@ function LoginContent() {
             TU PRÓXIMO<br/><span className="text-ember">OBJETIVO</span><br/>EMPIEZA ACÁ.
           </h1>
           <p className="mt-7 max-w-sm text-sm leading-7 text-bone-dim">
-            Accedé a tu cuenta, conservá tus productos y terminá tu compra con una experiencia segura.
+            Ingresá para terminar tu compra. Tus productos quedan guardados en el carrito.
           </p>
           <div className="mt-10 space-y-4 text-sm text-bone-dim">
-            <p className="flex items-center gap-3"><ShieldCheck size={19} className="text-ember"/> Cuenta protegida y email verificado</p>
-            <p className="flex items-center gap-3"><CheckCircle2 size={19} className="text-ember"/> Precios y disponibilidad validados al comprar</p>
+            <p className="flex items-center gap-3"><Gift size={19} className="text-ember" aria-hidden="true"/> Al crear tu cuenta das vuelta 3 cartas: 5 %, 10 % o envío gratis</p>
+            <p className="flex items-center gap-3"><Store size={19} className="text-ember" aria-hidden="true"/> Retirás en Azcuénaga 991 o te lo enviamos en Formosa Capital</p>
           </div>
         </div>
 

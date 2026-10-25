@@ -3,20 +3,21 @@ import Link from "next/link";
 
 import type { Producto } from "@/types/producto";
 const ars=(n:number)=>n.toLocaleString("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0});
+export const categoria=(slug:string)=>({proteinas:"Proteína",creatina:"Creatina","pre-entreno":"Pre-entreno",mass:"Ganador de masa",vitaminas:"Vitaminas",colageno:"Colágeno",alimentos:"Alimento proteico"} as Record<string,string>)[slug]??slug.replaceAll("-"," ");
+/** Frameless card: the shop photo carries it, the type does the rest. */
 export default function ProductoCard({producto}:{producto:Producto}){
 const descuento=producto.precioAnterior && producto.precioAnterior>producto.precio ? Math.round((1-producto.precio/producto.precioAnterior)*100):0;
-return <Link href={`/productos/${producto.slug}`} className="forge-card group" aria-label={`Ver ${producto.nombre}`}>
-<div className="forge-card-media relative aspect-[1/1.06] overflow-hidden p-5">
-<div className="absolute left-3 top-3 z-10 flex flex-col gap-1.5">
-{descuento>0&&<span className="w-fit rounded-md bg-ember px-2.5 py-1 text-[10px] font-extrabold tracking-wider text-white">-{descuento}%</span>}
-{producto.esNuevo&&<span className="w-fit rounded-md border border-carbon-line bg-carbon-raised px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider">NUEVO</span>}
-</div><Image src={producto.imagen} alt={producto.nombre} fill sizes="(min-width:1024px) 24vw,(min-width:640px) 45vw,50vw" className="object-contain p-7 sm:p-9" />
+const sabores=producto.sabores?.length??0;
+const agotado=producto.stock<=0;
+return <Link href={`/productos/${producto.slug}`} className="forge-product-tile group" aria-label={`Ver ${producto.nombre}`}>
+<div className="forge-card-media relative aspect-[4/5] overflow-hidden rounded-md">
+{descuento>0&&<span className="absolute left-2.5 top-2.5 z-10 rounded-[4px] bg-ember px-2 py-1 text-xs font-extrabold text-white">-{descuento}%</span>}
+{producto.esNuevo&&<span className="absolute right-2.5 top-2.5 z-10 rounded-[4px] bg-bone px-2 py-1 text-xs font-extrabold uppercase text-carbon">Nuevo</span>}
+<Image src={producto.imagen} alt={producto.nombre} fill sizes="(min-width:1024px) 24vw,(min-width:640px) 45vw,50vw" className={`object-cover ${agotado?"opacity-50 grayscale":""}`} />
+{agotado&&<span className="absolute inset-x-0 bottom-0 bg-black/75 py-2 text-center text-xs font-bold uppercase tracking-wider text-white">Sin stock</span>}
 </div>
-<div className="flex flex-1 flex-col border-t border-carbon-line p-4 sm:p-5">
-<span className="forge-label">{producto.categoria.replaceAll("-"," ")}</span>
-<h3 className="mt-2 min-h-[2.75rem] font-display text-sm font-bold leading-snug tracking-tight sm:text-base">{producto.nombre}</h3>
-<div className="mt-auto flex items-end justify-between gap-2 pt-5">
-<div><p className="text-[10px] uppercase tracking-widest text-bone-dim">{producto.stock>0?"Disponible":"Sin stock"}</p><strong className="mt-1 block font-display text-lg font-bold sm:text-xl">{ars(producto.precio)}</strong>{descuento>0&&<span className="text-xs text-bone-dim line-through">{ars(producto.precioAnterior!)}</span>}</div>
-
-</div></div></Link>;
+<h3 className="mt-3 font-display text-[15px] font-extrabold uppercase leading-snug tracking-[-.01em] sm:text-base">{producto.nombre}</h3>
+<p className="mt-1 text-[13px] text-bone-dim">{categoria(producto.categoria)}{sabores>1?` · ${sabores} sabores`:""}</p>
+<p className="mt-2 flex items-baseline gap-2"><strong className="font-display text-lg font-bold">{ars(producto.precio)}</strong>{descuento>0&&<s className="text-sm text-bone-dim">{ars(producto.precioAnterior!)}</s>}</p>
+</Link>;
 }

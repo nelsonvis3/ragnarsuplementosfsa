@@ -10,9 +10,11 @@ Ragnar Suplementos connects a responsive storefront to an administrative system 
 
 ## Screenshots
 
-| Product details | Shopping cart | Administration |
+| Storefront | Cart with a game reward | Owner dashboard |
 | --- | --- | --- |
-| ![Ragnar product page](docs/capturas/producto.jpg) | ![Cart and checkout](docs/capturas/carrito.jpg) | ![Catalog and order administration](docs/capturas/administracion.jpg) |
+| ![Ragnar storefront home](docs/capturas/home.jpg) | ![Cart with a 10% game discount applied](docs/capturas/carrito.jpg) | ![Owner dashboard with sales, visitors and stock](docs/capturas/administracion.jpg) |
+
+*Screenshots use test data, not the store's real sales.*
 
 ## What problem does it solve?
 
@@ -28,11 +30,16 @@ The business needed to update its own inventory, prices, photos, and bundles wit
 - Request local delivery quotes or choose store pickup.
 - Choose available manual payment methods; Mercado Pago integration is configurable but requires provider credentials and end-to-end acceptance before real transactions.
 - Send a customer-service request or request product advice.
+- Registered customers flip cards to win a 5 %, 10 % or free-shipping reward (one play on sign-up and another per approved purchase of five or more items); the discount is calculated on the server at checkout.
 
 **Store owner**
 - Manage categories, products, variants, bundles, images, pricing, and stock through `/administracion`.
 - Search and filter orders, inspect their recorded items, and perform permitted order-state transitions.
 - Review manually confirmed payments and cancel eligible orders with inventory restoration.
+- Follow sales, visitors (counted without cookies or IP addresses), conversion, best sellers and low stock on a dashboard.
+- Record in-store counter sales that deduct stock with the same locking as online checkout, and void them if entered by mistake.
+- See registered customers with their approved purchases, answer customer-service requests, and tune the card game's odds.
+- Edit transfer details, distance-based shipping rates and order-email messages without touching server configuration.
 - Access Django Admin for the underlying records and customer-service requests.
 
 ## Technology
@@ -113,6 +120,7 @@ A [VPS plan using Docker Compose, Nginx, HTTPS, PostgreSQL, and Redis](docs/VPS-
 - [HTTP API and permissions](docs/API.md)
 - [Technical audit and testing evidence](docs/AUDITORIA-2026-10-21.md)
 - [VPS / Docker / Nginx deployment plan](docs/VPS-DOCKER.md)
+- [Oracle Cloud Always Free server setup (Spanish)](docs/ORACLE-CLOUD.md)
 - [Environment variables and deployment](docs/DESPLIEGUE.md)
 - [Free demo hosting alternative](docs/DESPLIEGUE-GRATIS.md)
 

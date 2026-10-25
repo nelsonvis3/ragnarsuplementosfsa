@@ -17,6 +17,7 @@ const acciones: Record<AccionPedido, { titulo: string; descripcion: string }> = 
   consultar_pago: { titulo: "Consultar Mercado Pago", descripcion: "Se consultará el pago asociado y se actualizará el pedido según la respuesta del proveedor." },
   cerrar_sin_pago: { titulo: "Cerrar revisión sin pago", descripcion: "Usá esta opción únicamente después de verificar en Mercado Pago que no existe un pago aprobado. Se liberará la reserva." },
   cerrar_reembolsado: { titulo: "Registrar reembolso verificado", descripcion: "Esta acción registra una devolución que ya realizaste en Mercado Pago. No devuelve dinero por sí misma." },
+  anular_mostrador: { titulo: "Anular venta", descripcion: "Usalo si cargaste la venta por error: queda cancelada y las unidades vuelven al stock." },
 };
 const dinero = (valor: number) => valor.toLocaleString("es-AR", { style: "currency", currency: "ARS" });
 const fecha = (valor: string) => new Date(valor).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
@@ -75,7 +76,7 @@ export default function PedidosPanel({ token }: { token: string }) {
     } finally { setOcupado(false); setVerificado(false); refrescar(); }
   }
 
-  return <section aria-labelledby="pedidos-titulo" className="mt-8">
+  return <section aria-labelledby="pedidos-titulo">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h2 id="pedidos-titulo" className="font-display text-2xl font-semibold">Pedidos de la tienda</h2><p className="mt-2 text-sm text-bone-dim">Consultá cada compra, verificá los pagos y coordiná la entrega.</p></div>
       <button type="button" disabled={ocupado} onClick={refrescar} className={`${control} inline-flex items-center gap-2 disabled:opacity-50`}><RefreshCw size={16} /> Actualizar pedidos</button>
@@ -103,7 +104,7 @@ export default function PedidosPanel({ token }: { token: string }) {
           {datos.results.length === 0 ? <div className="p-8 text-center"><ShoppingBag size={28} className="mx-auto text-bone-dim" /><p className="mt-4 text-sm text-bone-dim">No hay pedidos que coincidan con estos filtros.</p></div> :
             <ul>{datos.results.map((item) => <li key={item.id} className="border-b border-carbon-line last:border-0">
               <button type="button" disabled={ocupado} aria-pressed={seleccion === item.id} onClick={() => { setSeleccion(item.id); setAccion(null); setVerificado(false); }} className={`w-full p-5 text-left transition-colors hover:bg-carbon disabled:opacity-60 ${seleccion === item.id ? "border-l-4 border-ember bg-carbon" : "border-l-4 border-transparent"}`}>
-                <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-bone-dim">Referencia {item.id} · {fecha(item.creado)}</span><Estado pedido={item} /></div>
+                <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-bone-dim">Referencia {item.id} · {fecha(item.creado)}{item.canal === "mostrador" && " · Mostrador"}</span><Estado pedido={item} /></div>
                 <p className="mt-3 break-words font-display text-base font-semibold">{item.nombre_pedido}</p>
                 <div className="mt-3 flex flex-wrap justify-between gap-2 text-sm"><span className="break-words text-bone-dim">{item.nombre_comprador}</span><strong>{dinero(item.total)}</strong></div>
               </button>
@@ -120,9 +121,9 @@ export default function PedidosPanel({ token }: { token: string }) {
             <p className="mt-2 text-xs text-bone-dim">Referencia {pedido.id} · {fecha(pedido.creado)}</p>
             <dl className="mt-6 space-y-3 text-sm">
               <div><dt className="text-bone-dim">Cliente</dt><dd className="mt-1 break-words font-medium">{pedido.nombre_comprador}</dd></div>
-              <div><dt className="text-bone-dim">Email</dt><dd className="mt-1 break-all"><a href={`mailto:${pedido.email_comprador}`} className="underline underline-offset-4">{pedido.email_comprador}</a></dd></div>
-              <div><dt className="text-bone-dim">Teléfono</dt><dd className="mt-1 break-words">{pedido.telefono_comprador}</dd></div>
-              <div><dt className="text-bone-dim">Entrega</dt><dd className="mt-1 break-words">{pedido.entrega_nombre}{pedido.direccion_entrega ? ` · ${pedido.direccion_entrega}` : ""}</dd></div>
+              {pedido.email_comprador && <div><dt className="text-bone-dim">Email</dt><dd className="mt-1 break-all"><a href={`mailto:${pedido.email_comprador}`} className="underline underline-offset-4">{pedido.email_comprador}</a></dd></div>}
+              {pedido.telefono_comprador && <div><dt className="text-bone-dim">Teléfono</dt><dd className="mt-1 break-words">{pedido.telefono_comprador}</dd></div>}
+              <div><dt className="text-bone-dim">Entrega</dt><dd className="mt-1 break-words">{pedido.canal === "mostrador" ? "Venta en mostrador" : `${pedido.entrega_nombre}${pedido.direccion_entrega ? ` · ${pedido.direccion_entrega}` : ""}`}</dd></div>
               <div><dt className="text-bone-dim">Medio de pago</dt><dd className="mt-1">{pedido.medio_pago_nombre}</dd></div>
               {pedido.pago_id && <div><dt className="text-bone-dim">ID del pago en Mercado Pago</dt><dd className="mt-1 break-all">{pedido.pago_id}</dd></div>}
             </dl>
@@ -130,6 +131,7 @@ export default function PedidosPanel({ token }: { token: string }) {
               {pedido.items.map((item, i) => <li key={i} className="flex items-start justify-between gap-3 py-3 text-sm"><span className="min-w-0 break-words">{item.cantidad} × {item.nombre}{item.sabor ? ` (${item.sabor})` : ""}</span><strong className="shrink-0">{dinero(item.precio_unitario * item.cantidad)}</strong></li>)}
             </ul>
             <p className="mt-4 flex justify-between gap-3 text-sm text-bone-dim"><span>Envío</span><span>{dinero(pedido.costo_envio)}</span></p>
+            {pedido.descuento > 0 && <p className="mt-2 flex justify-between gap-3 text-sm text-signal"><span>Premio del juego</span><span>−{dinero(pedido.descuento)}</span></p>}
             <p className="mt-2 flex justify-between gap-3 font-semibold"><span>Total</span><span>{dinero(pedido.total)}</span></p>
             {pedido.stock_reservado && <p className="mt-4 text-xs leading-6 text-bone-dim">Stock reservado{pedido.stock_reservado_hasta ? ` hasta ${fecha(pedido.stock_reservado_hasta)}` : ""}.</p>}
             {pedido.pagos_adicionales.length > 0 && <p className="mt-4 text-sm text-ember">Este pedido registra pagos adicionales. Revisalos en Mercado Pago antes de coordinar la entrega.</p>}

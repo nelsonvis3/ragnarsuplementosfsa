@@ -1,32 +1,14 @@
-<!doctype html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ragnar Suplementos — Desbloqueá tu potencial</title></head>
-<body style="margin:0;padding:0;background-color:#0b0d10;color:#f4f1ec;font-family:Arial,Helvetica,sans-serif;">
-  <div style="display:none;font-size:1px;color:#0b0d10;max-height:0;overflow:hidden;">Confirmá tu e-mail y desbloqueá tu potencial con Ragnar.</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0b0d10;">
-    <tr><td align="center" style="padding:36px 16px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#171a20;border:1px solid #34363b;">
-        <tr><td align="center" style="padding:32px 24px 24px;border-bottom:1px solid #34363b;">
-          <img src="cid:ragnar-logo" alt="Logo de Ragnar Suplementos" width="58" height="95" style="display:block;border:0;object-fit:contain;">
-          <p style="margin:16px 0 0;color:#f4f1ec;font-size:20px;font-weight:bold;letter-spacing:4px;">RAGNAR</p>
-          <p style="margin:6px 0 0;color:#f04452;font-size:12px;letter-spacing:3px;">SUPLEMENTOS</p>
-        </td></tr>
-        <tr><td style="padding:32px 24px;">
+{% extends "store/emails/base.html" %}
+{% block titulo %}Ragnar Suplementos — Desbloqueá tu potencial{% endblock %}
+{% block preheader %}Confirmá tu e-mail y desbloqueá tu potencial con Ragnar.{% endblock %}
+{% block contenido %}
           <p style="margin:0 0 12px;color:#f04452;font-size:11px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;">Tu próximo paso</p>
-          <h1 style="margin:0 0 20px;color:#f4f1ec;font-size:30px;line-height:1.2;">Desbloqueá tu potencial.</h1>
+          <h1 style="margin:0 0 20px;color:#f4f1ec;font-size:28px;line-height:1.2;">Desbloqueá tu potencial.</h1>
           <p style="margin:0 0 12px;color:#f4f1ec;font-size:16px;line-height:1.6;">Hola, {{ nombre }}.</p>
           <p style="margin:0 0 12px;color:#b8b2ae;font-size:16px;line-height:1.6;">Te damos la bienvenida a Ragnar Suplementos. Tu próximo paso empieza acá.</p>
           <p style="margin:0 0 24px;color:#f4f1ec;font-size:16px;line-height:1.6;">Hacé clic abajo para confirmar tu cuenta y desbloquear tu potencial.</p>
-          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="#d62839" style="background-color:#d62839;border-radius:9px;">
-            <a href="{{ enlace }}" style="display:inline-block;padding:16px 28px;border:1px solid #d62839;border-radius:9px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">Confirmar mi cuenta</a>
-          </td></tr></table>
-          <p style="margin:24px 0 0;color:#b8b2ae;font-size:13px;line-height:1.7;">El enlace vence en 24 horas y se puede usar una sola vez. Al confirmar tu email, tu sesión se inicia automáticamente.</p>
-          <p style="margin:16px 0 0;color:#b8b2ae;font-size:12px;line-height:1.7;">Si el botón no abre, copiá este enlace en tu navegador:<br><a href="{{ enlace }}" style="color:#f04452;word-break:break-all;">{{ enlace }}</a></p>
-          <p style="margin:24px 0 0;color:#b8b2ae;font-size:12px;line-height:1.7;">Si no creaste esta cuenta, ignorá este correo: la cuenta seguirá sin activar.</p>
-        </td></tr>
-        <tr><td align="center" style="padding:20px 24px;border-top:1px solid #34363b;color:#b8b2ae;font-size:12px;">Ragnar Suplementos · Fuerza que se nota.</td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>
+          {% include "store/emails/boton.html" with texto="Confirmar mi cuenta" %}
+          <p style="margin:24px 0 0;color:#b8b2ae;font-size:14px;line-height:1.7;">El enlace vence en 24 horas y se puede usar una sola vez. Al confirmar tu email, tu sesión se inicia automáticamente.</p>
+          <p style="margin:16px 0 0;color:#b8b2ae;font-size:13px;line-height:1.7;">Si el botón no abre, copiá este enlace en tu navegador:<br><a href="{{ enlace }}" style="color:#f04452;word-break:break-all;">{{ enlace }}</a></p>
+          <p style="margin:24px 0 0;color:#b8b2ae;font-size:13px;line-height:1.7;">Si no creaste esta cuenta, ignorá este correo: la cuenta seguirá sin activar.</p>
+{% endblock %}

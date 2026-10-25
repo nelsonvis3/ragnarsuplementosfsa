@@ -83,7 +83,7 @@ export interface ArticuloPedido {
   precio_unitario: number;
 }
 
-export type AccionPedido = "aprobar" | "cancelar" | "completar_stock" | "consultar_pago" | "cerrar_sin_pago" | "cerrar_reembolsado";
+export type AccionPedido = "aprobar" | "cancelar" | "completar_stock" | "consultar_pago" | "cerrar_sin_pago" | "cerrar_reembolsado" | "anular_mostrador";
 
 export interface PedidoAdministracion {
   id: number;
@@ -101,6 +101,8 @@ export interface PedidoAdministracion {
   direccion_entrega: string;
   total: number;
   costo_envio: number;
+  descuento: number;
+  canal: "web" | "mostrador";
   stock_reservado: boolean;
   stock_reservado_hasta: string | null;
   pago_id: string | null;
@@ -210,6 +212,16 @@ export async function crearCategoria(token: string, nombre: string): Promise<Cat
   });
 }
 
+export async function renombrarCategoria(token: string, id: number, nombre: string): Promise<Categoria> {
+  return solicitar<Categoria>(`/administracion/categorias/${id}/`, {
+    method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ nombre }),
+  });
+}
+
+export async function eliminarCategoria(token: string, id: number): Promise<void> {
+  return solicitar(`/administracion/categorias/${id}/`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+}
+
 export async function obtenerProductoPorSlug(slug: string): Promise<Producto | null> {
   try {
     return await solicitar<Producto>(`/productos/${encodeURIComponent(slug)}/`);
@@ -301,7 +313,8 @@ export async function crearPreferencia(
     forma: "retiro" | "envio";
     direccion?: string;
     cotizacionEnvio?: string;
-  }
+  },
+  usarPremio = false,
 ): Promise<ResultadoCheckout> {
   return solicitar<ResultadoCheckout>("/pagos/crear-preferencia", {
     method: "POST",
@@ -314,6 +327,7 @@ export async function crearPreferencia(
       email_comprador: emailComprador,
       medio_pago: medioPago,
       forma_entrega: entrega?.forma ?? "retiro",
+      usar_premio: usarPremio,
       ...(entrega?.forma === "envio"
         ? { direccion_entrega: entrega.direccion, cotizacion_envio: entrega.cotizacionEnvio }
         : {}),
@@ -392,3 +406,47 @@ export async function eliminarArticuloAdministracion(token: string, recurso: Rec
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+export interface PremioJuego { tipo: "porcentaje" | "envio_gratis"; porcentaje: number; descripcion: string; vence: string; disponible: boolean }
+export interface EstadoJuego { activo: boolean; puede_jugar: boolean; premio: PremioJuego | null }
+const autorizacion = (token?: string | null) => (token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+
+export async function obtenerJuego(token?: string | null): Promise<EstadoJuego> {
+  return solicitar<EstadoJuego>("/juego", autorizacion(token));
+}
+
+export async function jugarJuego(token: string): Promise<{ premio: PremioJuego; nuevo: boolean }> {
+  return solicitar("/juego/jugar", { method: "POST", ...autorizacion(token) });
+}
+
+export function registrarVisita(ruta: string) {
+  return solicitar<void>("/analitica/visita", { method: "POST", body: JSON.stringify({ ruta }) }).catch(() => undefined);
+}
+
+export interface ResumenPanel {
+  dias: number; ventas: number; cobrado: number; ticket_promedio: number; por_revisar: number; visitantes: number; vistas: number; conversion: number;
+  serie: { dia: string; total: number; pedidos: number; visitantes: number }[];
+  mas_vendidos: { nombre: string; unidades: number }[]; medios_pago: { medio: string; pedidos: number }[]; paginas: { ruta: string; vistas: number }[];
+  sin_stock: { id: number; nombre: string }[]; stock_bajo: { id: number; nombre: string; stock: number }[];
+  combos_publicados: number; consultas_pendientes: number;
+  ultimos: { id: number; comprador: string; total: number; estado: string; codigo_estado: string; creado: string }[];
+}
+export interface SolicitudPanel { id: number; tipo: string; tipo_nombre: string; nombre: string; email: string; telefono: string; numero_pedido: string; mensaje: string; estado: "pendiente" | "en_proceso" | "resuelta"; creado: string }
+export interface JuegoPanel { activo: boolean; peso_5: number; peso_10: number; peso_envio: number; dias_validez: number; premios: { usuario: string; premio: string; creado: string; vence: string; estado: string; pedido: number | null }[] }
+
+const conToken = (token: string, extra: RequestInit = {}): RequestInit => ({ ...extra, headers: { Authorization: `Bearer ${token}` } });
+export const obtenerResumen = (token: string, dias: number) => solicitar<ResumenPanel>(`/administracion/resumen/?dias=${dias}`, conToken(token));
+export const listarSolicitudes = (token: string, estado = "") => solicitar<SolicitudPanel[]>(`/administracion/solicitudes/${estado ? `?estado=${estado}` : ""}`, conToken(token));
+export const actualizarSolicitud = (token: string, id: number, estado: SolicitudPanel["estado"]) => solicitar<SolicitudPanel>(`/administracion/solicitudes/${id}/`, conToken(token, { method: "PATCH", body: JSON.stringify({ estado }) }));
+export const obtenerJuegoPanel = (token: string) => solicitar<JuegoPanel>("/administracion/juego/", conToken(token));
+export const guardarJuegoPanel = (token: string, datos: Partial<Omit<JuegoPanel, "premios">>) => solicitar<JuegoPanel>("/administracion/juego/", conToken(token, { method: "PATCH", body: JSON.stringify(datos) }));
+
+export interface ConfiguracionTienda { pago_titular: string; pago_alias: string; pago_cvu: string; envio_tarifas: string; instrucciones_local: string; instrucciones_efectivo_envio: string }
+export const obtenerTienda = (token: string) => solicitar<ConfiguracionTienda & { vigente: ConfiguracionTienda }>("/administracion/tienda/", conToken(token));
+export const guardarTienda = (token: string, datos: Partial<ConfiguracionTienda>) => solicitar<ConfiguracionTienda & { vigente: ConfiguracionTienda }>("/administracion/tienda/", conToken(token, { method: "PATCH", body: JSON.stringify(datos) }));
+
+export interface ClientePanel { id: number; nombre: string; email: string; alta: string; email_confirmado: boolean; compras: number; gastado: number; ultima_compra: string | null }
+export const listarClientes = (token: string, q = "") => solicitar<ClientePanel[]>(`/administracion/clientes/${q ? `?q=${encodeURIComponent(q)}` : ""}`, conToken(token));
+
+export interface VentaMostrador { venta_key: string; medio_pago: "local" | "transferencia"; items: ItemCheckout[]; nombre_comprador?: string; telefono_comprador?: string }
+export const registrarVentaMostrador = (token: string, venta: VentaMostrador) => solicitar<{ pedido_id: number; total: number }>("/administracion/ventas-mostrador/", conToken(token, { method: "POST", body: JSON.stringify(venta) }));
