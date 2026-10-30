@@ -6,6 +6,8 @@ Ragnar Suplementos connects a responsive storefront to an administrative system 
 
 **[Portfolio case study](https://nelsonsivisstum.vercel.app/en/projects/ragnar-suplementos/)** · **[API reference](docs/API.md)**
 
+**Status:** tested in a local environment, not yet published.
+
 ## Screenshots
 
 | Storefront | Cart with a game reward | Owner dashboard |
